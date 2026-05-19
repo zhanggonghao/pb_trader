@@ -1,0 +1,472 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>实时Alpha超额监控系统</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:#0a1628;color:#e0e6f0;min-height:100vh;overflow-x:hidden}
+
+/* ===== Header ===== */
+.header{background:linear-gradient(135deg,#0f2248,#1a3a6a);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a4a7a;box-shadow:0 2px 12px rgba(0,0,0,.3);position:sticky;top:0;z-index:100}
+.header h1{font-size:20px;font-weight:600;background:linear-gradient(90deg,#4fc3f7,#00e676);-webkit-background-clip:text;-webkit-text-fill-color:transparent;cursor:pointer;letter-spacing:1px}
+.header-right{display:flex;align-items:center;gap:18px;font-size:13px;color:#8899bb}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.status-dot.trading{background:#00e676;box-shadow:0 0 8px #00e67688}
+.status-dot.closed{background:#ff5252}
+.clock{font-family:'Consolas','Courier New',monospace;font-size:14px;color:#4fc3f7;letter-spacing:1px}
+
+/* ===== Container ===== */
+.container{padding:14px 16px;max-width:1600px;margin:0 auto}
+
+/* ===== Cards ===== */
+.card{background:linear-gradient(135deg,#112240,#1a2d50);border-radius:10px;padding:16px 18px;border:1px solid #253b5a;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:border-color .3s}
+.card:hover{border-color:#3a6a9a}
+.card-title{font-size:11px;color:#667799;margin-bottom:4px;letter-spacing:1px;text-transform:uppercase}
+.card-value{font-size:24px;font-weight:700;font-family:'Consolas','Courier New',monospace;transition:all .3s}
+.card-sub{font-size:11px;margin-top:2px;color:#667799}
+
+/* ===== Color Classes: A股习惯 红涨绿跌 ===== */
+.up{color:#ff5252}     /* 正值为红 */
+.down{color:#00e676}   /* 负值为绿 */
+.flat{color:#ffd740}
+
+/* ===== Row Layout ===== */
+.row{display:flex;gap:12px;margin-bottom:12px}
+.row-wrap{flex-wrap:wrap}
+.row-top{gap:10px}
+
+/* ===== Benchmark Section ===== */
+.benchmark-card{min-width:200px;flex:0 0 auto;padding:14px 16px}
+.benchmark-card .card-value{font-size:28px}
+.bench-stat-row{display:flex;gap:16px;margin-top:6px}
+.bench-stat{text-align:center}
+.bench-stat .label{font-size:10px;color:#556}
+.bench-stat .val{font-size:13px;font-weight:600;font-family:'Consolas','Courier New',monospace}
+
+/* ===== Account Cards ===== */
+.account-cards{display:flex;gap:10px;flex:1;min-width:0;overflow-x:auto;padding-bottom:4px}
+.account-card{min-width:270px;flex:1;padding:12px 14px;position:relative;overflow:hidden}
+.account-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 2px 2px 0}
+.account-card .acct-name{font-size:13px;font-weight:600;margin-bottom:6px}
+.acct-grid{display:flex;gap:16px}
+.acct-col{flex:1;min-width:0}
+.acct-col .label{font-size:10px;color:#556;margin-bottom:1px}
+.acct-col .value{font-size:20px;font-weight:700;font-family:'Consolas','Courier New',monospace}
+.acct-col .sub{font-size:10px;color:#445;margin-top:1px}
+
+/* ===== Median Bar ===== */
+.median-bar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.median-item{background:linear-gradient(135deg,#0d1a33,#152340);border:1px solid #1e3460;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;font-size:12px}
+.median-item .tag{color:#667799;font-size:10px}
+.median-item .num{font-family:'Consolas','Courier New',monospace;font-weight:600;font-size:15px}
+
+/* ===== Basis Section ===== */
+.basis-section{display:flex;gap:12px;margin-bottom:12px}
+.basis-chart-card{flex:1.2;min-width:0}
+.basis-table-card{flex:0.8;min-width:0;padding:12px 14px}
+.chart-container{width:100%;height:250px}
+.data-table{width:100%;border-collapse:collapse;font-size:11px}
+.data-table th{text-align:left;padding:5px 6px;color:#667799;font-weight:500;border-bottom:1px solid #253b5a}
+.data-table td{padding:4px 6px;border-bottom:1px solid #1a2d50;font-family:'Consolas','Courier New',monospace;white-space:nowrap}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+
+/* ===== Alpha Charts (每个账户一张) ===== */
+.alpha-charts-section{margin-bottom:12px}
+.alpha-charts-section .section-title{font-size:13px;color:#4fc3f7;margin-bottom:8px;padding-left:4px;display:flex;align-items:center;gap:8px}
+.alpha-charts-section .section-title::before{content:'';display:inline-block;width:3px;height:14px;background:#4fc3f7;border-radius:2px}
+.alpha-charts-grid{display:grid;gap:12px}
+.alpha-chart-card{background:linear-gradient(135deg,#0f1f3d,#18254a);border:1px solid #253b5a;border-radius:10px;padding:12px 14px;transition:border-color .3s}
+.alpha-chart-card:hover{border-color:#3a6a9a}
+.alpha-chart-card .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.alpha-chart-card .chart-title{font-size:13px;font-weight:600}
+.alpha-chart-card .chart-title .th-alpha{font-size:16px;margin-left:8px}
+.alpha-chart-card .chart-title .act-alpha{font-size:16px;margin-left:8px}
+.alpha-chart-card .chart-container-sm{width:100%;height:170px}
+
+/* ===== Futures Detail ===== */
+.futures-detail{padding:12px 14px}
+.futures-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px}
+.futures-col{border-radius:6px;padding:8px 10px;background:rgba(255,255,255,.02)}
+.futures-col h3{font-size:12px;margin-bottom:4px}
+.futures-col .data-table{font-size:10px}
+.futures-col .data-table td{padding:2px 4px}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:#0a1628}
+::-webkit-scrollbar-thumb{background:#2a4a7a;border-radius:2px}
+
+/* ===== Responsive ===== */
+@media(max-width:900px){
+  .row{flex-direction:column}
+  .basis-section{flex-direction:column}
+  .futures-grid{grid-template-columns:repeat(2,1fr)}
+  .account-cards{flex-direction:column}
+}
+@media(max-width:600px){
+  .futures-grid{grid-template-columns:1fr}
+  .header h1{font-size:16px}
+  .header-right{gap:10px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="header">
+    <h1 onclick="fetchData(true)">⚡ Alpha超额监控</h1>
+    <div class="header-right">
+        <span><span class="status-dot" id="statusDot"></span><span id="statusText">加载中...</span></span>
+        <span class="clock" id="clock">--:--:--</span>
+        <span id="updateTime" style="font-size:11px;color:#667799">--</span>
+    </div>
+</div>
+<div class="container">
+
+    <!-- 第一行：基准 + 账户卡片 -->
+    <div class="row row-wrap row-top">
+        <div class="card benchmark-card">
+            <div class="card-title">基准指数</div>
+            <div class="card-value" id="benchmarkPrice">--</div>
+            <div class="bench-stat-row">
+                <div class="bench-stat"><div class="label">昨收</div><div class="val" id="benchmarkPrevClose">--</div></div>
+                <div class="bench-stat"><div class="label">涨跌幅</div><div class="val" id="benchmarkReturn">--</div></div>
+            </div>
+        </div>
+        <div class="account-cards" id="accountCards"></div>
+    </div>
+
+    <!-- 中位数涨幅横条 -->
+    <div class="median-bar" id="medianBar"></div>
+
+    <!-- 第二行：基差图 + 基差表 -->
+    <div class="basis-section">
+        <div class="card basis-chart-card">
+            <div class="card-title">指数基差 (IF/IH/IC/IM)</div>
+            <div id="basisChart" class="chart-container"></div>
+        </div>
+        <div class="card basis-table-card">
+            <div class="card-title">主力合约基差</div>
+            <table class="data-table">
+                <thead><tr><th>合约</th><th>价格</th><th>基差</th><th>年化</th><th>持仓</th></tr></thead>
+                <tbody id="basisTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 第三行：Alpha走势（每个账户一张图） -->
+    <div class="alpha-charts-section">
+        <div class="section-title">Alpha走势 (理论 vs 实际)</div>
+        <div class="alpha-charts-grid" id="alphaChartsGrid"></div>
+    </div>
+
+    <!-- 第四行：各品种合约基差详情 -->
+    <div class="card futures-detail">
+        <div class="card-title">各品种合约基差详情</div>
+        <div class="futures-grid">
+            <div class="futures-col"><h3 style="color:#4fc3f7">IF</h3>
+                <table class="data-table"><thead><tr><th>合约</th><th>价格</th><th>基差</th><th>年化</th></tr></thead>
+                <tbody id="ifBasisBody"></tbody></table>
+            </div>
+            <div class="futures-col"><h3 style="color:#ffd740">IH</h3>
+                <table class="data-table"><thead><tr><th>合约</th><th>价格</th><th>基差</th><th>年化</th></tr></thead>
+                <tbody id="ihBasisBody"></tbody></table>
+            </div>
+            <div class="futures-col"><h3 style="color:#00e676">IC</h3>
+                <table class="data-table"><thead><tr><th>合约</th><th>价格</th><th>基差</th><th>年化</th></tr></thead>
+                <tbody id="icBasisBody"></tbody></table>
+            </div>
+            <div class="futures-col"><h3 style="color:#ff5252">IM</h3>
+                <table class="data-table"><thead><tr><th>合约</th><th>价格</th><th>基差</th><th>年化</th></tr></thead>
+                <tbody id="imBasisBody"></tbody></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+//  State
+// ==========================================
+var state={
+    basisChart:null,
+    alphaCharts:{},    // { shortName: {chart, index} }
+    chartsReady:false,
+    accColors:["#4fc3f7","#00e676","#ffd740","#ff5252","#ab47bc","#ff7043","#26c6da","#9ccc65"],
+};
+
+// ==========================================
+//  Helpers
+// ==========================================
+function $(id){return document.getElementById(id)}
+function sv(id,val,cls){var el=$(id);if(el){el.textContent=val;if(cls!==undefined)el.className=cls;}}
+function cls(v){return v>0?"up":(v<0?"down":"flat")}
+function fmtPct(v,showSign){
+    if(v===null||v===undefined)return"--";
+    var s=showSign&&v>0?"+":"";
+    return s+v.toFixed(2)+"%";
+}
+function fmt(v){
+    if(v===null||v===undefined||v===0)return"--";
+    if(Math.abs(v)>=1e8)return(v/1e8).toFixed(2)+"亿";
+    if(Math.abs(v)>=1e4)return(v/1e4).toFixed(2)+"万";
+    return Number(v).toFixed(2);
+}
+
+// ==========================================
+//  Init Charts
+// ==========================================
+function initCharts(){
+    var bc=$("basisChart");
+    if(!bc)return;
+    try{
+        state.basisChart=echarts.init(bc);
+        state.basisChart.setOption({
+            tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},
+            legend:{data:["基差(点)","年化成本(%)"],textStyle:{color:"#8899bb"},top:2,itemWidth:12,itemHeight:8},
+            grid:{left:50,right:50,top:32,bottom:20},
+            xAxis:{type:"category",data:[],axisLabel:{color:"#8899bb",fontSize:11,fontWeight:"bold"}},
+            yAxis:[
+                {type:"value",name:"基差(点)",nameTextStyle:{color:"#667799",fontSize:10},axisLabel:{color:"#667799",fontSize:10},splitLine:{lineStyle:{color:"#1a2d50",type:"dashed"}}},
+                {type:"value",name:"年化(%)",nameTextStyle:{color:"#667799",fontSize:10},axisLabel:{color:"#667799",fontSize:10},splitLine:{show:false}}
+            ],
+            series:[
+                {name:"基差(点)",type:"bar",data:[],itemStyle:{borderRadius:[3,3,0,0]},label:{show:true,position:"top",color:"#e0e6f0",fontSize:10,formatter:"{c}"}},
+                {name:"年化成本(%)",type:"line",yAxisIndex:1,data:[],smooth:true,symbol:"circle",symbolSize:5,lineStyle:{width:2},itemStyle:{color:"#4fc3f7"}}
+            ]
+        });
+        state.chartsReady=true;
+        window.addEventListener("resize",function(){
+            if(state.basisChart)state.basisChart.resize();
+            Object.keys(state.alphaCharts).forEach(function(k){
+                if(state.alphaCharts[k].chart)state.alphaCharts[k].chart.resize();
+            });
+        });
+    }catch(e){console.error("init chart error",e);}
+}
+
+// ==========================================
+//  Build Account Cards
+// ==========================================
+function buildAccountCards(accs){
+    var cont=$("accountCards");
+    if(!cont||!accs)return;
+    cont.innerHTML="";
+    accs.forEach(function(a,i){
+        var c=state.accColors[i%state.accColors.length];
+        var d=document.createElement("div");d.className="card account-card";
+        d.style.borderColor=c+"44";
+        d.innerHTML='<div class="acct-name" style="color:'+c+'">● '+a.name+'</div>'+
+            '<div class="acct-grid">'+
+            '<div class="acct-col"><div class="label">理论超额</div><div class="value" id="thAlpha_'+i+'">--</div>'+
+            '<div class="sub">组合 <span id="thPortRet_'+i+'">--</span></div></div>'+
+            '<div class="acct-col"><div class="label">实际超额</div><div class="value" id="actAlpha_'+i+'">--</div>'+
+            '<div class="sub">净值 <span id="actNetVal_'+i+'">--</span> | 涨幅 <span id="actRet_'+i+'">--</span></div></div>'+
+            '</div>';
+        cont.appendChild(d);
+    });
+}
+
+// ==========================================
+//  Median Bar
+// ==========================================
+function updateMedianBar(data){
+    var bar=$("medianBar");
+    if(!bar)return;
+    bar.innerHTML="";
+    var bm=data.benchmark;
+    if(bm&&bm.median_return!==null&&bm.median_return!==undefined){
+        var el=document.createElement("div");el.className="median-item";
+        el.innerHTML='<span class="tag">基准成分股中位数</span><span class="num '+cls(bm.median_return)+'">'+fmtPct(bm.median_return,true)+'</span>';
+        bar.appendChild(el);
+    }
+    var accs=data.accounts||[];
+    accs.forEach(function(a,i){
+        if(a.target_median_return!==null&&a.target_median_return!==undefined){
+            var c=state.accColors[i%state.accColors.length];
+            var el=document.createElement("div");el.className="median-item";
+            el.innerHTML='<span class="tag" style="color:'+c+'">● '+a.short_name+' Target</span><span class="num '+cls(a.target_median_return)+'">'+fmtPct(a.target_median_return,true)+'</span>';
+            bar.appendChild(el);
+        }
+    });
+}
+
+// ==========================================
+//  Alpha Charts (每个账户一张)
+// ==========================================
+function buildAlphaChartContainers(accs){
+    var grid=$("alphaChartsGrid");
+    if(!grid)return;
+    var n=accs.length;
+    grid.style.gridTemplateColumns="repeat("+Math.min(n,2)+",1fr)";
+    grid.innerHTML="";
+    accs.forEach(function(a,i){
+        var c=state.accColors[i%state.accColors.length];
+        var div=document.createElement("div");div.className="alpha-chart-card";
+        div.innerHTML='<div class="chart-header">'+
+            '<div class="chart-title" style="color:'+c+'">● '+a.short_name+
+            ' <span class="th-alpha" id="chartThAlpha_'+i+'">--</span>'+
+            ' <span style="color:#667799;font-size:10px">|</span> '+
+            '<span class="act-alpha" id="chartActAlpha_'+i+'">--</span></div>'+
+            '<div style="font-size:9px;color:#556">理论&nbsp;|&nbsp;实际</div></div>'+
+            '<div class="chart-container-sm" id="alphaChart_'+i+'"></div>';
+        grid.appendChild(div);
+    });
+    accs.forEach(function(a,i){
+        var dom=$("alphaChart_"+i);
+        if(!dom)return;
+        var c=state.accColors[i%state.accColors.length];
+        var chart=echarts.init(dom);
+        state.alphaCharts[a.short_name]={chart:chart,color:c,index:i};
+        chart.setOption({
+            tooltip:{trigger:"axis",valueFormatter:function(v){return v!==null&&v!==undefined?v.toFixed(2)+"%" :"--";}},
+            legend:{data:["理论","实际"],textStyle:{color:"#8899bb",fontSize:9},top:0,right:0,itemWidth:10,itemHeight:6},
+            grid:{left:42,right:8,top:26,bottom:16},
+            xAxis:{type:"time",axisLabel:{color:"#667799",fontSize:8},splitLine:{show:false}},
+            yAxis:{type:"value",name:"超额(%)",nameTextStyle:{color:"#667799",fontSize:8},axisLabel:{color:"#667799",fontSize:8},splitLine:{lineStyle:{color:"#1a2d50",type:"dashed"}}},
+            series:[
+                {name:"理论",type:"line",data:[],smooth:true,symbol:"none",lineStyle:{width:2,color:c}},
+                {name:"实际",type:"line",data:[],smooth:true,symbol:"none",lineStyle:{width:2,color:c,type:"dashed"}}
+            ]
+        });
+    });
+}
+
+function updateAlphaCharts(h,accs){
+    if(!h||!h.alpha)return;
+    var ah=h.alpha;
+    if(!ah.times||ah.times.length<2)return;
+    var now=new Date();
+    var ts=now.getFullYear()+"-"+(now.getMonth()+1).toString().padStart(2,"0")+"-"+now.getDate().toString().padStart(2,"0");
+    var times=ah.times.map(function(t){return new Date(ts+" "+t).getTime();});
+    accs.forEach(function(a,i){
+        var cs=state.alphaCharts[a.short_name];
+        if(!cs||!cs.chart)return;
+        var thKey="theoretical_"+a.short_name+"_excess";
+        var actKey="account_"+a.short_name+"_excess";
+        var thD=times.map(function(t,j){var v=(ah.theoretical&&ah.theoretical[thKey])?ah.theoretical[thKey][j]:null;return [t,v!==null?v:null];});
+        var actD=times.map(function(t,j){var v=(ah.accounts&&ah.accounts[actKey])?ah.accounts[actKey][j]:null;return [t,v!==null?v:null];});
+        cs.chart.setOption({xAxis:{min:times[0],max:times[times.length-1]},series:[{data:thD},{data:actD}]});
+        var lt=thD[thD.length-1],la=actD[actD.length-1];
+        var thV=(lt&&lt[1]!==null)?lt[1]:null;
+        var actV=(la&&la[1]!==null)?la[1]:null;
+        var te=$("chartThAlpha_"+i),ae=$("chartActAlpha_"+i);
+        if(te)te.innerHTML=(thV!==null)?'<span class="'+cls(thV)+'">'+fmtPct(thV,true)+'</span>':'--';
+        if(ae)ae.innerHTML=(actV!==null)?'<span class="'+cls(actV)+'">'+fmtPct(actV,true)+'</span>':'--';
+    });
+}
+
+// ==========================================
+//  Main Update
+// ==========================================
+function updateUI(data){
+    if(!data)return;
+    var b=data.benchmark,accts=data.accounts,fb=data.futures_basis,h=data.history;
+    sv("updateTime",data.timestamp||"");
+    var dot=$("statusDot"),txt=$("statusText");
+    if(dot&&txt){
+        dot.className=data.trading_time?"status-dot trading":"status-dot closed";
+        txt.textContent=data.trading_time?"交易中":(data.market_closed?"已收盘":"等待开市");
+        txt.style.color=data.trading_time?"#00e676":"#ff5252";
+    }
+    if(b){
+        sv("benchmarkPrice",b.price!==null?b.price.toFixed(2):"--");
+        sv("benchmarkPrevClose",b.prev_close!==null?b.prev_close.toFixed(2):"--");
+        if(b.return_pct!==null)sv("benchmarkReturn",fmtPct(b.return_pct,true),cls(b.return_pct));
+    }
+    if(accts&&accts.length>0&&!$("thAlpha_0")){
+        buildAccountCards(accts);
+        buildAlphaChartContainers(accts);
+    }
+    if(accts&&accts.length>0){
+        for(var i=0;i<accts.length;i++){
+            var th=accts[i].theoretical;
+            if(th&&th.valid){
+                sv("thAlpha_"+i,fmtPct(th.excess_return,true),cls(th.excess_return));
+                sv("thPortRet_"+i,fmtPct(th.portfolio_return,true),cls(th.portfolio_return));
+            }else{sv("thAlpha_"+i,"--");sv("thPortRet_"+i,"--");}
+            var ad=accts[i].account;
+            if(ad&&ad.valid){
+                sv("actAlpha_"+i,fmtPct(ad.excess_return,true),cls(ad.excess_return));
+                sv("actNetVal_"+i,fmt(ad.net_value));
+                sv("actRet_"+i,fmtPct(ad.net_return,true),cls(ad.net_return));
+            }else{sv("actAlpha_"+i,"--");sv("actNetVal_"+i,"--");sv("actRet_"+i,"--");}
+        }
+    }
+    updateMedianBar(data);
+    updateBasis(fb);
+    updateAlphaCharts(h,accts);
+}
+
+// ==========================================
+//  Update Basis
+// ==========================================
+function updateBasis(fd){
+    if(!fd||!state.basisChart)return;
+    var names=Object.keys(fd),bv=[],cv=[];
+    names.forEach(function(n){var p=fd[n];bv.push(p.dominant_basis||0);cv.push(p.dominant_basis_cost||0);});
+    state.basisChart.setOption({
+        xAxis:{data:names},
+        series:[
+            {data:bv,itemStyle:{color:bv.map(function(v){return v>=0?"#00e676":"#ff5252";})}},
+            {data:cv,itemStyle:{color:"#4fc3f7"}}
+        ]
+    });
+    var html="";
+    names.forEach(function(n){
+        var p=fd[n];if(!p||!p.dominant)return;
+        var dc=p.contracts?p.contracts[p.dominant]:null;
+        if(dc){
+            var bcls=cls(dc.basis),ccls=cls(dc.basis_cost_pct);
+            html+="<tr><td><b>"+n+"</b> "+p.dominant+"</td><td>"+dc.price.toFixed(2)+'</td><td class="'+bcls+'">'+(dc.basis>0?"+":"")+dc.basis.toFixed(2)+'</td><td class="'+ccls+'">'+(dc.basis_cost_pct>0?"+":"")+dc.basis_cost_pct.toFixed(2)+"%</td><td>"+(dc.volume/10000).toFixed(0)+"万</td></tr>";
+        }else{html+="<tr><td>"+n+'</td><td colspan="4">加载中...</td></tr>';}
+    });
+    $("basisTableBody").innerHTML=html;
+    var dids={IF:"ifBasisBody",IH:"ihBasisBody",IC:"icBasisBody",IM:"imBasisBody"};
+    Object.keys(dids).forEach(function(key){
+        var body=$(dids[key]);if(!body)return;
+        var p=fd[key];if(!p||!p.contracts){body.innerHTML='<tr><td colspan="4">无数据</td></tr>';return;}
+        var rows="";var cs=p.contracts_list||Object.keys(p.contracts).sort();
+        cs.forEach(function(c){
+            var dc=p.contracts[c];if(!dc)return;
+            var bcls=cls(dc.basis),ccls=cls(dc.basis_cost_pct),mk=dc.is_dominant?"*":"";
+            rows+="<tr><td>"+mk+c+"</td><td>"+dc.price.toFixed(2)+'</td><td class="'+bcls+'">'+(dc.basis>0?"+":"")+dc.basis.toFixed(2)+'</td><td class="'+ccls+'">'+(dc.basis_cost_pct>0?"+":"")+dc.basis_cost_pct.toFixed(2)+"%</td></tr>";
+        });
+        body.innerHTML=rows||'<tr><td colspan="4">无数据</td></tr>';
+    });
+}
+
+// ==========================================
+//  Fetch
+// ==========================================
+function fetchData(showFlash){
+    fetch("/api/data").then(function(r){return r.json()}).then(function(data){
+        updateUI(data);
+        if(showFlash){
+            document.querySelectorAll(".card, .alpha-chart-card").forEach(function(c){
+                c.style.opacity="0.6";c.style.transition="opacity .3s";
+                requestAnimationFrame(function(){c.style.opacity="1";});
+            });
+        }
+    }).catch(function(err){
+        console.error(err);
+        var txt=$("statusText");if(txt)txt.textContent="连接失败";
+        var dot=$("statusDot");if(dot)dot.className="status-dot closed";
+    });
+}
+
+function updateClock(){var n=new Date();$("clock").textContent=n.toLocaleTimeString("zh-CN",{hour12:false});}
+
+function boot(){
+    updateClock();setInterval(updateClock,1000);
+    if(typeof echarts!=="undefined"){initCharts();}
+    else{var ci=setInterval(function(){if(typeof echarts!=="undefined"){initCharts();clearInterval(ci);}},200);setTimeout(function(){clearInterval(ci);},10000);}
+    setTimeout(fetchData,500);
+    setInterval(function(){fetchData(false);},10000);
+}
+if(document.readyState==="complete"){boot();}else{window.addEventListener("load",boot);}
+</script>
+</body>
+</html>
+

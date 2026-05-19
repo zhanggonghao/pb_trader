@@ -1,0 +1,190 @@
+# ============================================================
+# split_system 配置文件
+# 用途：读取目标权重 + 合并昨收持仓 → 生成交易拆分指令（调仓/建仓/T0）
+# ============================================================
+
+# 运行日期 (YYYYMMDD 或 "current" 表示当日)
+date: "current"
+
+# ---------- rqdatac 米筐量化平台 ----------
+rqdatac:
+  username: "license"
+  password: "gCKbHurs4dlMyehGC3GVBEYgFsPRZZiVNUWfCJCS9ifEdXYWnBqgopXvtwMg3GdeJxvb02yljxgaEYxhu1pREMs6k4oFmIU5e0Lf4k56THXNJdgY9i90ehi9i_Hh9sDDSHYg3WgNslsvOwIo4Ku66nV2P1T69RprXP0OIqsep3M=F1112RCtTHbSGqqSJUDAyNXbGm-ik0mkYJGwcAKsg8YNX6oj6u_dAnCo2tUYJ6jp7PAtYxCA3p3SXDA5xa4f_X-eZA5T2vbtFqWkHU5QEz6gDnIsCHX5JSkzUIPqToU8rLOD8D3q-MAJICrCnZ8B4y3Hp6X6KCSR_8X8vMddDkc="
+  use_pool: true
+  max_pool_size: 8
+
+# ---------- 日志 ----------
+logging:
+  level: "INFO"
+  log_dir: "E:/code/generate_split_system/logs"
+  max_bytes: 10485760
+  backup_count: 30
+
+# ---------- 路径配置 ----------
+raw_target_path: "E:\\code\\generate_split_system\\data\\target"
+standard_path: "E:\\code\\generate_split_system\\data\\standarddata"
+mo_order_path: "E:\\code\\generate_split_system\\data\\mo_order"
+net_email_path: "E:\\code\\generate_split_system\\data\\raw\\net_email"
+
+# ---------- 交易参数 ----------
+lngexpose: 0.03
+
+# ---------- 产品及账户配置 ----------
+product_info:
+  PBTZ2H:
+    product_chinese_name: "配邦投资二号"
+    product_type: "zx"
+    benchmark: "hs300"
+    fut_info:
+      DZQH: "88861713"
+    acct_info:
+      zhaoshang_PBTZ2H:
+        acct_chinese_name: "招商配邦投资二号"
+        acct_num: "S8000025409"
+        is_adj: true
+        adj_client: "交易大师"
+        adj_acct: "S8000025409"
+        adj_algo: "HX"
+        adj_algo_starttime: "095000"
+        adj_algo_endtime: "095500"
+        is_t0: false
+        t0_client: "交易大师"
+        t0_acct: "S8000025409"
+        t0_algo: " "
+        t0_algo_starttime: "095000"
+        t0_algo_endtime: "145500"
+        target_uid: "ABCD"
+        adjust_value: 0
+        pre_reduce_value: 0
+        pre_build_value: 0
+
+  PBZS1H:
+    product_chinese_name: "配邦中圣1号"
+    product_type: "zq"
+    benchmark: "hs300"
+    acct_info:
+      haitong_PBZS1H:
+        acct_chinese_name: "海通配邦中圣1号"
+        acct_num: "132803"
+        is_adj: true
+        adj_client: "ATX"
+        adj_acct: "peibang-pt-71-pbzs"
+        adj_algo: "KF"
+        adj_algo_starttime: "095000"
+        adj_algo_endtime: "095500"
+        is_t0: true
+        t0_client: "道和方舟"
+        t0_acct: "peibang-pt-71-pbzs"
+        t0_algo: "YR"
+        t0_algo_starttime: "095000"
+        t0_algo_endtime: "145500"
+        target_uid: "WBZD"
+        adjust_value: 0
+        pre_reduce_value: 0
+        pre_build_value: 0
+
+  PBHSZX1H:
+    product_chinese_name: "配邦恒升中性1号"
+    product_type: "zx"
+    benchmark: "hs300"
+    fut_info:
+      GTJA: "80050993"
+    option_info:
+      GTJA: "9507050001"
+    acct_info:
+      haitongcredit_PBHSZX1H:
+        acct_chinese_name: "海通配邦恒升中性1号"
+        acct_num: "60010146"
+        is_adj: true
+        rzrq: true
+        adj_client: "ATX"
+        adj_acct: "peibang-lr-71-hszx1"
+        adj_algo: "KF"
+        adj_algo_starttime: "095000"
+        adj_algo_endtime: "095500"
+        is_t0: true
+        t0_client: "道和方舟"
+        t0_acct: "peibang-lr-71-hszx1"
+        t0_algo: "YR"
+        t0_algo_starttime: "095000"
+        t0_algo_endtime: "145500"
+        target_uid: "TCHMD"
+        adjust_value: -50000
+        pre_build_value: 0
+      gtht_PBHSZX1H:
+        acct_chinese_name: "国泰海通配邦恒升中性1号"
+        acct_num: "10510783"
+        round_lot: "old"
+        is_adj: true
+        adj_client: "ATX"
+        adj_acct: "配邦恒升中性1号证券"
+        adj_algo: "KF"
+        adj_algo_starttime: "143000"
+        adj_algo_endtime: "145700"
+        is_t0: false
+        t0_client: ""
+        t0_acct: ""
+        t0_algo: ""
+        t0_algo_starttime: ""
+        t0_algo_endtime: ""
+        target_uid: "CZQZX300"
+        adjust_value: 0
+        pre_build_value: 0
+        # 该账户需从邮件下载外部权重文件
+        download_target_email:
+          keywords: ["ZX300", "{date}"]
+          file_extensions: [".csv"]
+          file_pattern: "ZX300_weight_{date}.csv"
+          rename_to: "{date}_CZQZX300_000300.XSHG_000906.XSHG_target.csv"
+
+  # # 华通香港账户（暂未启用）
+  # HTHTPB:
+  #   product_chinese_name: "华通华泰配邦"
+  #   product_type: "zq"
+  #   benchmark: "hs300"
+  #   acct_info:
+  #     huataisc_HTHTPB:
+  #       acct_chinese_name: "华泰国际华通华泰配邦"
+  #       acct_num: " "
+  #       is_adj: true
+  #       rzrq: false
+  #       adj_client: "bloomberg"
+  #       adj_acct: "HTST"
+  #       adj_algo: "EMSX"
+  #       adj_algo_starttime: "095000"
+  #       adj_algo_endtime: "095500"
+  #       is_t0: false
+  #       t0_client: "道和方舟"
+  #       t0_acct: "peibang-lr-71-hszx1"
+  #       t0_algo: "YR"
+  #       t0_algo_starttime: "095000"
+  #       t0_algo_endtime: "145500"
+  #       target_uid: "TCHMD"
+  #       adjust_value: 20000
+  #       pre_build_value: 0
+
+  # # 华通香港账户（暂未启用）
+  # HTZXPB:
+  #   product_chinese_name: "华通中信配邦"
+  #   product_type: "zq"
+  #   benchmark: "hs300"
+  #   acct_info:
+  #     zhongxin_HTZXPB:
+  #       acct_chinese_name: "中信华通中信配邦"
+  #       acct_num: "2740477"
+  #       is_adj: true
+  #       rzrq: false
+  #       adj_client: "CATS"
+  #       adj_acct: "2740477"
+  #       adj_algo: "VWAP3"
+  #       adj_algo_starttime: "095000"
+  #       adj_algo_endtime: "095500"
+  #       is_t0: false
+  #       t0_client: "CATS"
+  #       t0_acct: "2740477"
+  #       t0_algo: "YR"
+  #       t0_algo_starttime: "095000"
+  #       t0_algo_endtime: "145500"
+  #       target_uid: "TCHMD"
+  #       adjust_value: 20000
+  #       pre_build_value: 0
