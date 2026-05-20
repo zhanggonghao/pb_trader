@@ -45,16 +45,16 @@ product_info:
         adj_client: "交易大师"
         adj_acct: "S8000025409"
         adj_algo: "HX"
-        adj_algo_starttime: "095000"
-        adj_algo_endtime: "095500"
+        adj_algo_starttime: "093000"
+        adj_algo_endtime: "093500"
         is_t0: false
         t0_client: "交易大师"
         t0_acct: "S8000025409"
         t0_algo: " "
-        t0_algo_starttime: "095000"
+        t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "ABCD"
-        adjust_value: 0
+        adjust_value: -80000
         pre_reduce_value: 0
         pre_build_value: 0
 
@@ -70,16 +70,16 @@ product_info:
         adj_client: "ATX"
         adj_acct: "peibang-pt-71-pbzs"
         adj_algo: "KF"
-        adj_algo_starttime: "095000"
-        adj_algo_endtime: "095500"
+        adj_algo_starttime: "093000"
+        adj_algo_endtime: "093500"
         is_t0: true
         t0_client: "道和方舟"
         t0_acct: "peibang-pt-71-pbzs"
         t0_algo: "YR"
-        t0_algo_starttime: "095000"
+        t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "WBZD"
-        adjust_value: 0
+        adjust_value: -30000
         pre_reduce_value: 0
         pre_build_value: 0
 
@@ -100,16 +100,16 @@ product_info:
         adj_client: "ATX"
         adj_acct: "peibang-lr-71-hszx1"
         adj_algo: "KF"
-        adj_algo_starttime: "095000"
-        adj_algo_endtime: "095500"
+        adj_algo_starttime: "093000"
+        adj_algo_endtime: "093500"
         is_t0: true
         t0_client: "道和方舟"
         t0_acct: "peibang-lr-71-hszx1"
         t0_algo: "YR"
-        t0_algo_starttime: "095000"
+        t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "TCHMD"
-        adjust_value: -50000
+        adjust_value: -60000
         pre_build_value: 0
       gtht_PBHSZX1H:
         acct_chinese_name: "国泰海通配邦恒升中性1号"
@@ -151,13 +151,13 @@ product_info:
   #       adj_client: "bloomberg"
   #       adj_acct: "HTST"
   #       adj_algo: "EMSX"
-  #       adj_algo_starttime: "095000"
-  #       adj_algo_endtime: "095500"
+  #       adj_algo_starttime: "093000"
+  #       adj_algo_endtime: "093500"
   #       is_t0: false
   #       t0_client: "道和方舟"
   #       t0_acct: "peibang-lr-71-hszx1"
   #       t0_algo: "YR"
-  #       t0_algo_starttime: "095000"
+  #       t0_algo_starttime: "093000"
   #       t0_algo_endtime: "145500"
   #       target_uid: "TCHMD"
   #       adjust_value: 20000
@@ -177,13 +177,13 @@ product_info:
   #       adj_client: "CATS"
   #       adj_acct: "2740477"
   #       adj_algo: "VWAP3"
-  #       adj_algo_starttime: "095000"
-  #       adj_algo_endtime: "095500"
+  #       adj_algo_starttime: "093000"
+  #       adj_algo_endtime: "093500"
   #       is_t0: false
   #       t0_client: "CATS"
   #       t0_acct: "2740477"
   #       t0_algo: "YR"
-  #       t0_algo_starttime: "095000"
+  #       t0_algo_starttime: "093000"
   #       t0_algo_endtime: "145500"
   #       target_uid: "TCHMD"
   #       adjust_value: 20000
