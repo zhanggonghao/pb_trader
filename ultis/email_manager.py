@@ -391,7 +391,7 @@ class EmailManager:
 
     def download_attachments_by_keyword(self, keyword: Union[List[str], str] = None, save_dir: Optional[str] = None,
                                         file_extensions: Optional[List[str]] = None,
-                                        limit: int = 10) -> int:
+                                        limit: int = 50) -> int:
         """
         根据主题关键字下载附件
         :param keyword: 主题关键字
@@ -418,7 +418,7 @@ class EmailManager:
         total = 0
         for eid in email_ids:
             total += self.download_attachments(eid, save_dir, file_extensions)
-        print(f"🎉 共下载 {total} 个附件（关键字：{keyword}）")
+        print(f"🎉 共下载 {total} 个附件（关键字：{keyword}, 路径:{save_dir}）")
         return total
 
     def download_images_by_keyword(self, keyword: str, save_dir: Optional[str] = None,

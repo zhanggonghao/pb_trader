@@ -4,6 +4,7 @@ split_system.py
 """
 import math
 import os
+import shutil
 import sys
 import yaml
 import rqdatac
@@ -43,9 +44,17 @@ class SplitSystem(object):
     def __init__(self, date: str, config: Config):
         self.date = date
         self.pre_date = rqdatac.get_previous_trading_date(date).strftime('%Y%m%d')
-        self.raw_target_path = config.get('raw_target_path')
-        self.standard_path = config.get('standard_path')
-        self.mo_order_path = config.get('mo_order_path')
+
+        self.data_path = config.get('data_path')
+        self.raw_target_path = os.path.join(self.data_path, 'data', 'target')
+        self.standard_path = os.path.join(self.data_path, 'data', 'standarddata')
+        self.mo_order_path = os.path.join(self.data_path, 'data', 'mo_order')
+
+        self.local_path = config.get('local_path')
+        self.local_raw_target_path = os.path.join(self.local_path, 'data', 'target')
+        self.local_standard_path = os.path.join(self.local_path, 'data', 'standarddata')
+        self.local_mo_order_path = os.path.join(self.local_path, 'data', 'mo_order')
+
         self.lngexpose = config.get('lngexpose')
         self.product_info = config.get('product_info', {})
         self._logger = get_logger('split_system')
@@ -59,6 +68,17 @@ class SplitSystem(object):
 
         self._logger.info('获取期货昨收行情...')
         self.fut_close = self.get_fut_close()
+
+    # ================================================================
+    # 文件路径辅助：优先本地，不存在则使用远程
+    # ================================================================
+    def _resolve_read_path(self, local_path, remote_path):
+        """读取文件时优先使用本地路径，不存在则退回到远程路径"""
+        if os.path.exists(local_path):
+            self._logger.debug(f'  读取本地文件: {local_path}')
+            return local_path
+        self._logger.debug(f'  本地文件不存在，读取远程: {remote_path}')
+        return remote_path
 
     def stk_mkt_close(self):
         """获取股票昨收价格"""
@@ -77,7 +97,9 @@ class SplitSystem(object):
 
     def get_prepos(self, acct):
         """获取昨收持仓"""
-        pos_paths = f'{self.standard_path}/pos/{self.pre_date}/{self.pre_date}_{acct}_pos.csv'
+        pos_paths_local = f'{self.local_standard_path}/pos/{self.pre_date}/{self.pre_date}_{acct}_pos.csv'
+        pos_paths_remote = f'{self.standard_path}/pos/{self.pre_date}/{self.pre_date}_{acct}_pos.csv'
+        pos_paths = self._resolve_read_path(pos_paths_local, pos_paths_remote)
         if os.path.exists(pos_paths):
             pos = pd.read_csv(pos_paths, index_col=0)
             self._logger.debug(f'  昨收持仓 {acct}: {len(pos)} 条')
@@ -88,8 +110,11 @@ class SplitSystem(object):
 
     def get_raw_target(self, uid):
         """获取原始 target 文件"""
-        target_path = f'{self.raw_target_path}/{self.date}'
-        target_paths = match_file(target_path, uid, self.date)
+        target_path_local = f'{self.local_raw_target_path}/{self.date}'
+        target_paths_local = match_file(target_path_local, uid, self.date)
+        target_path_remote = f'{self.raw_target_path}/{self.date}'
+        target_paths_remote = match_file(target_path_remote, uid, self.date)
+        target_paths = target_paths_local if target_paths_local is not None else target_paths_remote
         if target_paths is None:
             raise FileNotFoundError(
                 f'未找到 target 文件: {target_path}/{self.date}_{uid}_*_target.csv')
@@ -359,6 +384,16 @@ class SplitSystem(object):
                 acct, acct_info.get('t0_algo_starttime'), acct_info.get('t0_algo_endtime'),
             )
 
+        # 同步订单文件到本地
+        try:
+            src_mo_dir = os.path.join(self.mo_order_path, self.date)
+            dst_mo_dir = os.path.join(self.local_mo_order_path, self.date)
+            if os.path.exists(src_mo_dir):
+                shutil.copytree(src_mo_dir, dst_mo_dir, dirs_exist_ok=True)
+                self._logger.info(f'  订单文件已同步到本地: {dst_mo_dir}')
+        except Exception as copy_err:
+            self._logger.warning(f'  订单文件同步到本地失败: {copy_err}')
+
         return summary
 
     def main(self):
@@ -406,7 +441,13 @@ class SplitSystem(object):
                             if os.path.exists(src):
                                 os.rename(src, expected_file)
                                 self._logger.info(f'  权重文件已保存: {rename_to}')
+                                # 同步到本地
+                                local_target_date = os.path.join(self.local_raw_target_path, self.date)
+                                os.makedirs(local_target_date, exist_ok=True)
+                                shutil.copy2(expected_file, os.path.join(local_target_date, rename_to))
+                                self._logger.info(f'  已同步到本地: {local_target_date}')
                             else:
+
                                 self._logger.warning(f'  下载后未找到文件: {file_pattern}')
                         except Exception as e:
                             self._logger.warning(f'  下载失败: {e}')

@@ -51,15 +51,17 @@ def format_code_EMSX(code):
     
     return f'{code} CH Equity'
 
-haitongcredit_rzmr_df = pd.read_csv(r'E:\code\generate_split_system\data\raw\rzrq\haitongcredit_rzmr.csv', encoding='gbk')
+
+data_path = r'\\192.168.3.100\samba'
+haitongcredit_rzmr_path = os.path.join(data_path, 'data', 'raw', 'rzrq', 'haitongcredit_rzmr.csv')
+haitongcredit_rzmr_df = pd.read_csv(haitongcredit_rzmr_path, encoding='gbk')
 haitongcredit_rzmr_df = haitongcredit_rzmr_df[haitongcredit_rzmr_df['融资状态'] == '正常'].reset_index(drop=True)
 haitongcredit_rzmr_codes = haitongcredit_rzmr_df['证券代码'].unique().tolist()
 
-haitongcredit_danbaopin_df = pd.read_csv(r'E:\code\generate_split_system\data\raw\rzrq\haitongcredit_danbaopin.csv', encoding='gbk')
+haitongcredit_danbaopin_df = pd.read_csv(r'\\192.168.3.100\samba\data\raw\rzrq\haitongcredit_danbaopin.csv', encoding='gbk')
 haitongcredit_danbaopin_df = haitongcredit_danbaopin_df[haitongcredit_danbaopin_df['是否可做担保'] == '正常'].reset_index(drop=True)
 haitongcredit_danbaopin_codes = haitongcredit_danbaopin_df['证券代码'].unique().tolist()
 
-# print(haitongcredit_rzmr_codes)
 
 # 调仓 20250718_ATX_gtja_PBPFZX1H_adj_KF_0930_0940.csv
 def format_adj_algo(mo_path, data, date, adj_client, adj_acct, adj_algo, acct, adj_algo_starttime, adj_algo_endtime, rzrq=False, algo_type='adj'):

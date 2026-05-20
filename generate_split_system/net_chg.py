@@ -5,6 +5,7 @@
 
 import logging
 import os
+import shutil
 import sys
 import warnings
 from typing import Dict, Optional, Tuple, List, Any
@@ -248,10 +249,25 @@ class ProductNetCalculator:
     def __init__(self, date: str, config: Dict):
         self.date = date
         self.pre_date = MarketDataFetcher.get_previous_trading_date(date)
-        self.standard_path = config.get('standard_path')
         self.product_info = config.get('product_info', {})
         self.margin_ratio = config.get('margin_ratio', MarketConstants.DEFAULT_MARGIN_RATIO)
-        self.net_email_path = config.get('net_email_path')
+
+        # 远程路径
+        self.data_path = config.get('data_path')
+        self.standard_path = os.path.join(self.data_path, 'data', 'standarddata')
+        self.out_path = os.path.join(self.data_path, 'data', 'out')
+        self.mo_order_path = os.path.join(self.data_path, 'data', 'mo_order')
+        self.dw_path = os.path.join(self.data_path, 'data')
+        self.net_email_path = os.path.join(self.data_path, 'data', 'raw', 'net_email')
+
+        # 本地路径（读取时优先使用，不存在时退回到远程）
+        self.local_path = config.get('local_path')
+        self.local_standard_path = os.path.join(self.local_path, 'data', 'standarddata')
+        self.local_out_path = os.path.join(self.local_path, 'data', 'out')
+        self.local_mo_order_path = os.path.join(self.local_path, 'data', 'mo_order')
+        self.local_dw_path = os.path.join(self.local_path, 'data')
+        self.local_net_email_path = os.path.join(self.local_path, 'data', 'raw', 'net_email')
+
         self._download_emails()
 
         # 初始化市场数据获取器
@@ -261,7 +277,17 @@ class ProductNetCalculator:
         self.adj_periods = self._get_adj_periods()
         self.stk_price = self.market.get_stock_price_info(self.adj_periods)
 
-    # -------------------- 辅助方法 --------------------
+    # ================================================================
+    # 文件路径辅助：优先本地，不存在则使用远程
+    # ================================================================
+    def _resolve_read_path(self, local_path, remote_path):
+        """读取文件时优先使用本地路径，不存在则退回到远程路径"""
+        if os.path.exists(local_path):
+            logger.debug(f'  读取本地文件: {local_path}')
+            return local_path
+        logger.debug(f'  本地文件不存在，读取远程: {remote_path}')
+        return remote_path
+
     def _get_adj_periods(self) -> List[Tuple[str, str]]:
         """获取调仓时段（从配置中提取）"""
         periods = []
@@ -284,12 +310,23 @@ class ProductNetCalculator:
                 name = '配邦中圣'
             match_file = self._match_file(self.net_email_path, name, format_predate)
             if not match_file or not os.path.exists(match_file):
+                match_file = self._match_file(self.local_net_email_path, name, format_predate)
+            if not match_file or not os.path.exists(match_file):
                 try:
                     manager.download_attachments_by_keyword([name, format_predate], save_dir=self.net_email_path,
                                                             file_extensions=['.xlsx'])
                 except Exception as e:
                     logger.warning(f"下载 {self.pre_date} {name} 产品净值邮件出错: {e}")
         manager.logout()
+
+        # 远程已下载完成，同步到本地
+        os.makedirs(self.local_net_email_path, exist_ok=True)
+        for fn in os.listdir(self.net_email_path):
+            src_file = os.path.join(self.net_email_path, fn)
+            dst_file = os.path.join(self.local_net_email_path, fn)
+            if os.path.isfile(src_file) and not os.path.exists(dst_file):
+                shutil.copy2(src_file, dst_file)
+                logger.info(f'  同步邮件附件到本地: {fn}')
 
     @staticmethod
     def _match_file(path: str, key: str, date_str: str) -> Optional[str]:
@@ -314,7 +351,10 @@ class ProductNetCalculator:
         """统一读取产品相关文件（支持多文件合并）"""
         if date is None:
             date = self.date
-        base_dir = os.path.join(self.standard_path, subdir, date)
+        # 优先使用本地路径
+        local_base = os.path.join(self.local_standard_path, subdir, date)
+        remote_base = os.path.join(self.standard_path, subdir, date)
+        base_dir = self._resolve_read_path(local_base, remote_base)
         if subdir in ['assets', 'pos']:
             pattern = os.path.join(base_dir, f"{date}*{product}{suffix}.csv")
             files = glob(pattern)
@@ -350,6 +390,8 @@ class ProductNetCalculator:
     def _get_deposits_withdrawals(self, product: str) -> float:
         """获取出入金总额"""
         dw_path = os.path.join(self.standard_path, 'out_in', 'deposits_withdrawals.csv')
+        dw_path_local = dw_path.replace(self.standard_path, self.local_standard_path, 1)
+        dw_path = dw_path_local if os.path.exists(dw_path_local) else dw_path
         if not os.path.exists(dw_path):
             return 0.0
         dw_df = pd.read_csv(dw_path, index_col=0)
@@ -360,6 +402,8 @@ class ProductNetCalculator:
         """获取前一日净资产（收盘价、结算价）及期货静态权益"""
         pre_file = os.path.join(self.standard_path, 'net_data', self.pre_date,
                                 f'{self.pre_date}_{product}_net_info.csv')
+        pre_file_local = pre_file.replace(self.standard_path, self.local_standard_path, 1)
+        pre_file = pre_file_local if os.path.exists(pre_file_local) else pre_file
         if not os.path.exists(pre_file):
             return 0.0, 0.0, 0.0
         pre_df = pd.read_csv(pre_file)
@@ -373,6 +417,8 @@ class ProductNetCalculator:
         if product_chinese == '配邦中圣1号':
             product_chinese = '配邦中圣'
         file_path = self._match_file(self.net_email_path, product_chinese, format_predate)
+        if not file_path or not os.path.exists(file_path):
+            file_path = self._match_file(self.local_net_email_path, product_chinese, format_predate)
         if not file_path:
             return 0.0
         data = pd.read_excel(file_path)[:1].rename(columns={'日期': '净值日期', '资产份额净值(元)': '单位净值'})
@@ -947,6 +993,16 @@ def main():
         # 保存汇总文件
         combined_nav.to_csv(os.path.join(calculator.standard_path, 'net_data', date, f"{date}_all_product_info.csv"),
                             index=False)
+        # 同步输出文件到本地
+        try:
+            for sync_dir in ['net_data', 'stk_fut', 't0_adj']:
+                src_sync = os.path.join(calculator.standard_path, sync_dir, date)
+                dst_sync = os.path.join(calculator.local_standard_path, sync_dir, date)
+                if os.path.exists(src_sync):
+                    shutil.copytree(src_sync, dst_sync, dirs_exist_ok=True)
+                    logger.info(f'  同步 {sync_dir} 到本地')
+        except Exception as sync_e:
+            logger.warning(f'  同步到本地失败: {sync_e}')
 
     if all_futures_detail:
         combined_fut = pd.concat(all_futures_detail, ignore_index=True)
@@ -1050,6 +1106,16 @@ def run():
             # 保存汇总文件
             combined_nav.to_csv(
                 os.path.join(calculator.standard_path, 'net_data', date, f"{date}_all_product_info.csv"), index=False)
+            # 同步输出文件到本地
+            try:
+                for sync_dir in ['net_data', 'stk_fut', 't0_adj']:
+                    src_sync = os.path.join(calculator.standard_path, sync_dir, date)
+                    dst_sync = os.path.join(calculator.local_standard_path, sync_dir, date)
+                    if os.path.exists(src_sync):
+                        shutil.copytree(src_sync, dst_sync, dirs_exist_ok=True)
+                        logger.info(f'  同步 {sync_dir} 到本地')
+            except Exception as sync_e:
+                logger.warning(f'  同步到本地失败: {sync_e}')
 
         if all_futures_detail:
             combined_fut = pd.concat(all_futures_detail, ignore_index=True)

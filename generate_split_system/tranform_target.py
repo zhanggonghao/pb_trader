@@ -8,6 +8,7 @@ import io
 import os
 import sys
 import contextlib
+import shutil
 import logging
 import warnings
 import datetime as dt
@@ -16,6 +17,8 @@ import yaml
 import rqdatac
 import pandas as pd
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
 from pathlib import Path
 
 # 自动把 D:\code 加入 Python 搜索路径
@@ -47,10 +50,23 @@ class TransformTarget:
 
     def __init__(self, config: Config, date: str):
         # ---- 从配置读取所有参数 ----
-        self.model_path = config.get('model_path')
-        self.target_path = config.get('target_path')
-        self.database_path = config.get('DATABASE_PATH')
-        self.blacklist_path = config.get('blacklist_path')
+        self.data_path = config.get('data_path')
+        self.local_path = config.get('local_path')
+        self.database_path = os.path.join(self.data_path, 'Market')
+        self.model_path = os.path.join(self.data_path, 'trading_pred_df')
+
+        # 本地路径（读取时优先使用，不存在时退回到远程）
+        self.local_database_path = os.path.join(self.local_path, 'Market')
+        self.local_model_path = os.path.join(self.local_path, 'trading_pred_df')
+
+        # 远程服务器目录
+        self.target_path = os.path.join(self.data_path, 'data', 'target')
+        self.blacklist_path = os.path.join(self.data_path, 'data', 'raw', 'blacklist')
+
+        # 本地目录
+        self.local_target_path = os.path.join(self.local_path, 'data', 'target')
+        self.local_blacklist_path = os.path.join(self.local_path, 'data', 'raw', 'blacklist')
+
         self.model_file_pattern = config.get('model_file_pattern',
                                               'df_test_PB_V0422_{pre_date}.parquet')
         self.parameters = config.get('parameters', {})
@@ -93,6 +109,17 @@ class TransformTarget:
         # 因子暴露（一次性计算，抑制外部模块冗长输出）
         self.stock_factors, self.index_exposures = self._get_factor_explosure()
 
+    # ================================================================
+    # 文件路径辅助：优先本地，不存在则使用远程
+    # ================================================================
+    def _resolve_read_path(self, local_path, remote_path):
+        """读取文件时优先使用本地路径，不存在则退回到远程路径"""
+        if os.path.exists(local_path):
+            self._logger.debug(f'  读取本地文件: {local_path}')
+            return local_path
+        self._logger.debug(f'  本地文件不存在，读取远程: {remote_path}')
+        return remote_path
+
     # ====================================================================
     # 黑名单邮件
     # ====================================================================
@@ -125,7 +152,47 @@ class TransformTarget:
                     subject='中信里昂黑名单缺失',
                     body='未收到中信里昂黑名单邮件',
                 )
+        manager.logout()
 
+        # 远程已下载完成，同步到本地
+        os.makedirs(self.local_blacklist_path, exist_ok=True)
+        for fname_base in ['cms_long_short_black_list', 'Restriction_List']:
+            remote_file = os.path.join(self.blacklist_path, f'{fname_base}_{self.date}.xlsx')
+            local_file = os.path.join(self.local_blacklist_path, f'{fname_base}_{self.date}.xlsx')
+            if os.path.exists(remote_file):
+                shutil.copy2(remote_file, local_file)
+                self._logger.info(f'  同步黑名单到本地: {local_file}')
+
+    def _download_blackfile_from_email_local(self):
+
+        manager = EmailManager()
+
+        cms_file = f'{self.local_blacklist_path}/cms_long_short_black_list_{self.date}.xlsx'
+        if not os.path.exists(cms_file):
+            self._logger.info('下载招商 DMA 黑名单...')
+            manager.download_attachments_by_keyword(
+                ['cms_long_short_black_list', self.date],
+                save_dir=self.local_blacklist_path,
+                file_extensions=['.xlsx'],
+                limit=self._rt_download_limit,
+            )
+
+        restriction_file = f'{self.local_blacklist_path}/Restriction_List_{self.date}.xlsx'
+        if not os.path.exists(restriction_file):
+            self._logger.info('下载中信里昂限制名单...')
+            manager.download_attachments_by_keyword(
+                ['Restriction List', self.date],
+                save_dir=self.local_blacklist_path,
+                file_extensions=['.xlsx'],
+                limit=self._rt_download_limit,
+            )
+            if not os.path.exists(restriction_file):
+                self._logger.warning('中信里昂黑名单缺失，发送提醒邮件')
+                manager.send_email_with_attachments(
+                    to=self._rt_alert_recipients,
+                    subject='中信里昂黑名单缺失',
+                    body='未收到中信里昂黑名单邮件',
+                )
         manager.logout()
 
     # ====================================================================
@@ -133,8 +200,15 @@ class TransformTarget:
     # ====================================================================
     def _get_factor_explosure(self):
         try:
-            stock_factors = pd.read_parquet(rf'{self.database_path}\factors\factors_post_1d\adjusted_1800_vs_300exposures.parquet').set_index(['date', 'order_book_id'])
-            index_exposures = pd.read_parquet(rf'{self.database_path}\factors\factors_post_1d\adjusted_300_index_exposures.parquet')
+            # 优先读取本地因子暴露文件
+            sf_local = (rf'{self.local_database_path}\factors\factors_post_1d\adjusted_1800_vs_300exposures.parquet')
+            sf_remote = (rf'{self.database_path}\factors\factors_post_1d\adjusted_1800_vs_300exposures.parquet')
+            sf_path = self._resolve_read_path(sf_local, sf_remote)
+            stock_factors = pd.read_parquet(sf_path).set_index(['date', 'order_book_id'])
+            ie_local = (rf'{self.local_database_path}\factors\factors_post_1d\adjusted_300_index_exposures.parquet')
+            ie_remote = (rf'{self.database_path}\factors\factors_post_1d\adjusted_300_index_exposures.parquet')
+            ie_path = self._resolve_read_path(ie_local, ie_remote)
+            index_exposures = pd.read_parquet(ie_path)
             self._logger.info(
                 f'从服务器获取因子暴露完成 | 个股={stock_factors.shape}  指数暴露={index_exposures.shape}')
         except Exception as e:
@@ -153,6 +227,13 @@ class TransformTarget:
                 stock_factors, index_exposures = factor_explosure.main(
                     sample_range, bench_mark, start_date,
                     self.database_path, window)
+                # 自动计算完成后，同步因子文件到本地
+                try:
+                    shutil.copytree(self.database_path, self.local_database_path,
+                                    dirs_exist_ok=True)
+                    self._logger.info('  因子数据已同步到本地')
+                except Exception as copy_err:
+                    self._logger.warning(f'  因子数据同步到本地失败: {copy_err}')
         return stock_factors, index_exposures
 
     # ====================================================================
@@ -167,7 +248,8 @@ class TransformTarget:
                 bench_mark=bench_mark,
                 start=self._pre_date,
                 end=self._pre_date,
-                data_path=self.database_path,
+                data_path=self._resolve_read_path(
+                    self.local_database_path, self.database_path),
                 stock_weight_multiplier=float(stock_weight_multiplier),
                 stock_weight_fallback=float(stock_weight_fallback),
                 stock_weight_cap=(None if stock_weight_cap is None
@@ -196,9 +278,13 @@ class TransformTarget:
         bw = bw[bw['weight'] > 0].reset_index(drop=True)
         codes = bw['order_book_id'].unique().tolist()
 
-        industry_path = os.path.join(
+        industry_path_local = os.path.join(
+            self.local_database_path,
+            'stocks/basics/all_instruments_level1_industry.feather')
+        industry_path_remote = os.path.join(
             self.database_path,
             'stocks/basics/all_instruments_level1_industry.feather')
+        industry_path = self._resolve_read_path(industry_path_local, industry_path_remote)
         ind = pd.read_feather(industry_path)
         ind['date'] = pd.to_datetime(ind['date'])
         ind = ind[(ind['date'] == pd.to_datetime(self._pre_date))
@@ -217,7 +303,10 @@ class TransformTarget:
         blacklist = []
         if black_list:
             resolved = black_list.replace(self._rt_placeholder_date, f'{self.date}')
-            data = pd.read_excel(f'{self.blacklist_path}/{resolved}')
+            blacklist_file_local = os.path.join(self.local_blacklist_path, resolved)
+            blacklist_file_remote = os.path.join(self.blacklist_path, resolved)
+            blacklist_file = self._resolve_read_path(blacklist_file_local, blacklist_file_remote)
+            data = pd.read_excel(blacklist_file)
             data['pair_id'] = data['pair_id'].apply(lambda x: str(x).split('@')[0])
             blacklist = data['pair_id'].unique().tolist()
         combined = list(set(blacklist + forbid_lst))
@@ -267,7 +356,9 @@ class TransformTarget:
         blacklist = self._get_blacklist(black_list, forbid_lst)
 
         model_file = self.model_file_pattern.replace('{pre_date}', self.pre_date)
-        model_path_full = os.path.join(self.model_path, model_file)
+        model_path_local = os.path.join(self.local_model_path, model_file)
+        model_path_remote = os.path.join(self.model_path, model_file)
+        model_path_full = self._resolve_read_path(model_path_local, model_path_remote)
         if not os.path.exists(model_path_full):
             raise FileNotFoundError(f'模型文件不存在: {model_path_full}')
 
@@ -346,9 +437,13 @@ class TransformTarget:
     # 上期目标权重
     # ====================================================================
     def _get_pre_target_weights(self, bench_mark, sample_range, unique_id):
-        pre_path = os.path.join(
+        pre_path_local = os.path.join(
+            self.local_target_path, self.pre_date,
+            f'{self.pre_date}_{unique_id}_{bench_mark}_{sample_range}_target.csv')
+        pre_path_remote = os.path.join(
             self.target_path, self.pre_date,
             f'{self.pre_date}_{unique_id}_{bench_mark}_{sample_range}_target.csv')
+        pre_path = self._resolve_read_path(pre_path_local, pre_path_remote)
         if os.path.exists(pre_path):
             pre = pd.read_csv(pre_path)
             pre['code'] = pre['code'].apply(lambda x: int(str(x)[:6]))
@@ -401,13 +496,22 @@ class TransformTarget:
         self._logger.debug(f'  行业分布:\n{iw.to_string()}')
 
         # 保存
+        # 1.远程
         target_dir = os.path.join(self.target_path, self.date)
         os.makedirs(target_dir, exist_ok=True)
         target_file = os.path.join(
             target_dir,
             f'{self.date}_{unique_id}_{bench_mark}_{sample_range}_target.csv')
         target.to_csv(target_file, encoding='gbk')
-        self._logger.debug(f'  已保存: {target_file}')
+        self._logger.info(f'  已保存: {target_file}')
+        # 2.本地
+        local_target_dir = os.path.join(self.local_target_path, self.date)
+        os.makedirs(local_target_dir, exist_ok=True)
+        local_target_file = os.path.join(
+            local_target_dir,
+            f'{self.date}_{unique_id}_{bench_mark}_{sample_range}_target.csv')
+        target.to_csv(local_target_file, encoding='gbk')
+        self._logger.info(f'  已保存: {local_target_file}')
 
     # ====================================================================
     # 处理单个 unique_id

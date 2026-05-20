@@ -17,20 +17,19 @@ rqdatac:
 # ---------- 日志 ----------
 logging:
   level: "INFO"
-  log_dir: 'E:\code\generate_split_system/logs'
+#  log_dir: 'E:\code\generate_split_system/logs' # 交易机配置
+  log_dir: 'D:\pb_trader\generate_split_system/logs' # 备用机配置
   max_bytes: 10485760
   backup_count: 30
 
 # # ---------- 路径配置 ----------
-# model_path: '\\192.168.3.100\samba\trading_pred_df'
-# target_path: 'D:\code\generate_split_system\data\target'
-# DATABASE_PATH: '\\192.168.3.100\samba\Market'
-# blacklist_path: 'D:\code\generate_split_system\data\raw\blacklist'
-# ---------- 路径配置 ----------
-model_path: 'Y:\trading_pred_df'
-target_path: 'E:\code\generate_split_system\data\target'
-DATABASE_PATH: 'Y:\Market'
-blacklist_path: 'E:\code\generate_split_system\data\raw\blacklist'
+
+data_path: '\\192.168.3.100\samba'
+##1.交易机配置
+#local_path: 'E:\\code\\generate_split_system'
+#2.备用机配置
+local_path: 'D:\\pb_trader\\generate_split_system'
+
 
 # ---------- 模型文件 ----------
 # {pre_date} → 前一交易日 (YYYYMMDD)

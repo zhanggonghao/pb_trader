@@ -16,15 +16,20 @@ rqdatac:
 # ---------- 日志 ----------
 logging:
   level: "INFO"
-  log_dir: "E:/code/generate_split_system/logs"
+#  log_dir: "E:/code/generate_split_system/logs" # 交易机配置
+  log_dir: "D:/pb_trader/generate_split_system/logs" # 备用机配置
   max_bytes: 10485760
   backup_count: 30
 
 # ---------- 路径配置 ----------
-raw_target_path: "E:\\code\\generate_split_system\\data\\target"
-standard_path: "E:\\code\\generate_split_system\\data\\standarddata"
-mo_order_path: "E:\\code\\generate_split_system\\data\\mo_order"
-net_email_path: "E:\\code\\generate_split_system\\data\\raw\\net_email"
+##1.交易机配置
+#local_path: 'E:\\code\\generate_split_system'
+
+#2.备用机配置
+local_path: 'D:\\pb_trader\\generate_split_system'
+
+# samba通用配置, 从192.168.3.100服务器读取数据
+data_path: '\\192.168.3.100\samba'
 
 # ---------- 交易参数 ----------
 lngexpose: 0.03
@@ -60,7 +65,7 @@ product_info:
 
   PBZS1H:
     product_chinese_name: "配邦中圣1号"
-    product_type: "zq"
+    product_type: "zx"
     benchmark: "hs300"
     acct_info:
       haitong_PBZS1H:
