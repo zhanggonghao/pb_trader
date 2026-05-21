@@ -20,10 +20,10 @@ from tabulate import tabulate
 from pathlib import Path
 # 自动把 D:\code 加入 Python 搜索路径
 sys.path.append(str(Path(__file__).parent.parent))
-
-rqdatac.init(username="license",
-             password="jUrRi5rWOK6uHreZ4wu0xKpFZjBEixs5oNQWutfnMJPpZRx1Gl0tXIJ10-EXkrgE5rIkTzM64U53dN1ZPVvOe8icNOsmwUlD4lsGp5BF9zsNIhJdPIsQGUS7lHz34DID1myOgeNFKHQ09d1Ksl6uEIEx9_9k8t47PyBdAKP_4Eg=Jx6_6AXjiwzgXLUaIbCiNSUjxHL6UStZcJpDfAThNGIH-GijxfIXSBF9SQBGeerCtxJnwW1WRl47cINvGdy4X895G54jfUsMOQCeT8PO4n_TY3vWlzp8jmNcViOCgx2iqHfMlDCdCGMZ9UsSd1XEju90XNLT1gBzpDPOsaC9a30=",
-             use_pool=True, max_pool_size=8)
+#
+# rqdatac.init(username="license",
+#              password="jUrRi5rWOK6uHreZ4wu0xKpFZjBEixs5oNQWutfnMJPpZRx1Gl0tXIJ10-EXkrgE5rIkTzM64U53dN1ZPVvOe8icNOsmwUlD4lsGp5BF9zsNIhJdPIsQGUS7lHz34DID1myOgeNFKHQ09d1Ksl6uEIEx9_9k8t47PyBdAKP_4Eg=Jx6_6AXjiwzgXLUaIbCiNSUjxHL6UStZcJpDfAThNGIH-GijxfIXSBF9SQBGeerCtxJnwW1WRl47cINvGdy4X895G54jfUsMOQCeT8PO4n_TY3vWlzp8jmNcViOCgx2iqHfMlDCdCGMZ9UsSd1XEju90XNLT1gBzpDPOsaC9a30=",
+#              use_pool=True, max_pool_size=8)
 
 # 导入邮件管理器（原项目模块）
 from ultis.email_manager import EmailManager
@@ -326,7 +326,7 @@ class ProductNetCalculator:
             dst_file = os.path.join(self.local_net_email_path, fn)
             if os.path.isfile(src_file) and not os.path.exists(dst_file):
                 shutil.copy2(src_file, dst_file)
-                logger.info(f'  同步邮件附件到本地: {fn}')
+                logger.debug(f'  同步邮件附件到本地: {fn}')
 
     @staticmethod
     def _match_file(path: str, key: str, date_str: str) -> Optional[str]:
@@ -373,7 +373,7 @@ class ProductNetCalculator:
     # -------------------- 期货相关计算 --------------------
     def _get_futures_assets(self, product: str) -> Tuple[float, float, float]:
         """获取期货静态权益、出金、入金"""
-        fut_assets = self._read_product_files(product, 'fut_data', '_fut_assets')
+        fut_assets = self._read_product_files(product, 'fut', '_fut_assets')
         if fut_assets is None:
             return 0.0, 0.0, 0.0
         return fut_assets['DynamicRights'].sum(), fut_assets['Withdraw'].sum(), fut_assets['Deposit'].sum()
@@ -389,8 +389,8 @@ class ProductNetCalculator:
 
     def _get_deposits_withdrawals(self, product: str) -> float:
         """获取出入金总额"""
-        dw_path = os.path.join(self.standard_path, 'out_in', 'deposits_withdrawals.csv')
-        dw_path_local = dw_path.replace(self.standard_path, self.local_standard_path, 1)
+        dw_path = os.path.join(self.dw_path, 'deposits_withdrawals.csv')
+        dw_path_local = dw_path.replace(self.dw_path, self.local_dw_path, 1)
         dw_path = dw_path_local if os.path.exists(dw_path_local) else dw_path
         if not os.path.exists(dw_path):
             return 0.0
@@ -400,9 +400,9 @@ class ProductNetCalculator:
 
     def _get_previous_net(self, product: str) -> Tuple[float, float, float]:
         """获取前一日净资产（收盘价、结算价）及期货静态权益"""
-        pre_file = os.path.join(self.standard_path, 'net_data', self.pre_date,
+        pre_file = os.path.join(self.out_path, 'net_data', self.pre_date,
                                 f'{self.pre_date}_{product}_net_info.csv')
-        pre_file_local = pre_file.replace(self.standard_path, self.local_standard_path, 1)
+        pre_file_local = pre_file.replace(self.out_path, self.local_out_path, 1)
         pre_file = pre_file_local if os.path.exists(pre_file_local) else pre_file
         if not os.path.exists(pre_file):
             return 0.0, 0.0, 0.0
@@ -427,7 +427,7 @@ class ProductNetCalculator:
 
     def _calc_futures_diff_pnl(self, product: str) -> Tuple[float, float, float]:
         """计算期货结算价与收盘价的差异盈亏、持仓市值和保证金"""
-        fut_pos = self._read_product_files(product, 'fut_data', '_fut_pos')
+        fut_pos = self._read_product_files(product, 'fut', '_fut_pos')
         if fut_pos is None or fut_pos.empty:
             return 0.0, 0.0, 0.0, 0.0, 0.0
 
@@ -474,7 +474,7 @@ class ProductNetCalculator:
 
     def _calc_futures_order_pnl(self, product: str) -> Tuple[float, float, float, float]:
         """计算期货交易盈亏（quant/cta）"""
-        fut_order = self._read_product_files(product, 'fut_data', '_fut_order')
+        fut_order = self._read_product_files(product, 'fut', '_fut_order')
         if fut_order is None or fut_order.empty:
             return 0.0, 0.0, 0.0, 0.0
         fut_order = fut_order[fut_order['code'].isin(self.fut_info.index)]
@@ -497,7 +497,7 @@ class ProductNetCalculator:
 
     def _calc_futures_pos_pnl(self, product: str) -> Tuple[float, float, float, float, float, float]:
         """计算期货持仓盈亏（量化/CTA）"""
-        fut_pos = self._read_product_files(product, 'fut_data', '_fut_pos')
+        fut_pos = self._read_product_files(product, 'fut', '_fut_pos')
         if fut_pos is None or fut_pos.empty:
             return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         fut_pos = fut_pos[fut_pos['code'].isin(self.fut_info.index)]
@@ -918,15 +918,14 @@ def main():
     date = config_mgr.get_date()
 
     # 可手动指定日期（原代码中有硬编码，保留灵活性）
-    date = '20260519'   # 如需固定日期可取消注释
+    date = '20260520'   # 如需固定日期可取消注释
 
-    print(config)
-    exit()
 
     # 初始化rqdatac
+    rqdatac_config = config.get('rqdatac')
     rqdatac.init(
-        config.get('rqdatac_user', '13601611030'),
-        config.get('rqdatac_password', 'PB123456789')
+        rqdatac_config.get('rqdatac_user', '13601611030'),
+        rqdatac_config.get('rqdatac_password', 'PB123456789')
     )
 
     calculator = ProductNetCalculator(date, config)
@@ -951,13 +950,13 @@ def main():
             all_futures_detail.append(fut_df)
 
             # 保存单个产品净值文件
-            out_dir = os.path.join(calculator.standard_path, 'net_data', date)
+            out_dir = os.path.join(calculator.out_path, 'net_data', date)
             os.makedirs(out_dir, exist_ok=True)
             nav_df.to_csv(os.path.join(out_dir, f"{date}_{product}_net_info.csv"), index=False)
             logger.info(f"保存 {product} 净值文件")
 
             # 保存单个产品期货文件
-            fut_out_dir = os.path.join(calculator.standard_path, 'stk_fut', date)
+            fut_out_dir = os.path.join(calculator.out_path, 'stk_fut', date)
             os.makedirs(fut_out_dir, exist_ok=True)
             fut_df.to_csv(os.path.join(fut_out_dir, f"{date}_{product}_fut_info.csv"), index=False)
             logger.info(f"保存 {product} 期货文件")
@@ -972,12 +971,12 @@ def main():
                     all_account_detail.append(acc_df)
                     all_t0_detail.append(t0_df)
                     # 保存账户明细
-                    stk_out_dir = os.path.join(calculator.standard_path, 'stk_fut', date)
+                    stk_out_dir = os.path.join(calculator.out_path, 'stk_fut', date)
                     os.makedirs(stk_out_dir, exist_ok=True)
                     acc_df.to_csv(os.path.join(stk_out_dir, f"{date}_{acct}_stk_info.csv"), index=False)
 
                     # 保存账户t0调仓明细
-                    t0_out_dir = os.path.join(calculator.standard_path, 't0_adj', date)
+                    t0_out_dir = os.path.join(calculator.out_path, 't0_adj', date)
                     os.makedirs(t0_out_dir, exist_ok=True)
                     t0_df.to_csv(os.path.join(t0_out_dir, f"{date}_{acct}_t0_adj_info.csv"), index=False)
                 except Exception as e:
@@ -991,16 +990,16 @@ def main():
         combined_nav = pd.concat(all_product_nav, ignore_index=True)
         ReportGenerator.display_product_summary(combined_nav)
         # 保存汇总文件
-        combined_nav.to_csv(os.path.join(calculator.standard_path, 'net_data', date, f"{date}_all_product_info.csv"),
+        combined_nav.to_csv(os.path.join(calculator.out_path, 'net_data', date, f"{date}_all_product_info.csv"),
                             index=False)
         # 同步输出文件到本地
         try:
             for sync_dir in ['net_data', 'stk_fut', 't0_adj']:
-                src_sync = os.path.join(calculator.standard_path, sync_dir, date)
-                dst_sync = os.path.join(calculator.local_standard_path, sync_dir, date)
+                src_sync = os.path.join(calculator.out_path, sync_dir, date)
+                dst_sync = os.path.join(calculator.local_out_path, sync_dir, date)
                 if os.path.exists(src_sync):
                     shutil.copytree(src_sync, dst_sync, dirs_exist_ok=True)
-                    logger.info(f'  同步 {sync_dir} 到本地')
+                    logger.debug(f'  同步 {sync_dir} 到本地')
         except Exception as sync_e:
             logger.warning(f'  同步到本地失败: {sync_e}')
 
@@ -1064,13 +1063,13 @@ def run():
                     all_futures_detail.append(fut_df)
 
                 # 保存单个产品净值文件
-                out_dir = os.path.join(calculator.standard_path, 'net_data', date)
+                out_dir = os.path.join(calculator.out_path, 'net_data', date)
                 os.makedirs(out_dir, exist_ok=True)
                 nav_df.to_csv(os.path.join(out_dir, f"{date}_{product}_net_info.csv"), index=False)
                 logger.info(f"保存 {product} 净值文件")
 
                 # 保存单个产品期货文件
-                fut_out_dir = os.path.join(calculator.standard_path, 'stk_fut', date)
+                fut_out_dir = os.path.join(calculator.out_path, 'stk_fut', date)
                 os.makedirs(fut_out_dir, exist_ok=True)
                 fut_df.to_csv(os.path.join(fut_out_dir, f"{date}_{product}_fut_info.csv"), index=False)
                 logger.info(f"保存 {product} 期货文件")
@@ -1085,12 +1084,12 @@ def run():
                         all_account_detail.append(acc_df)
                         all_t0_detail.append(t0_df)
                         # 保存账户明细
-                        stk_out_dir = os.path.join(calculator.standard_path, 'stk_fut', date)
+                        stk_out_dir = os.path.join(calculator.out_path, 'stk_fut', date)
                         os.makedirs(stk_out_dir, exist_ok=True)
                         acc_df.to_csv(os.path.join(stk_out_dir, f"{date}_{acct}_stk_info.csv"), index=False)
 
                         # 保存账户t0调仓明细
-                        t0_out_dir = os.path.join(calculator.standard_path, 't0_adj', date)
+                        t0_out_dir = os.path.join(calculator.out_path, 't0_adj', date)
                         os.makedirs(t0_out_dir, exist_ok=True)
                         t0_df.to_csv(os.path.join(t0_out_dir, f"{date}_{acct}_t0_adj_info.csv"), index=False)
                     except Exception as e:
@@ -1109,11 +1108,11 @@ def run():
             # 同步输出文件到本地
             try:
                 for sync_dir in ['net_data', 'stk_fut', 't0_adj']:
-                    src_sync = os.path.join(calculator.standard_path, sync_dir, date)
-                    dst_sync = os.path.join(calculator.local_standard_path, sync_dir, date)
+                    src_sync = os.path.join(calculator.out_path, sync_dir, date)
+                    dst_sync = os.path.join(calculator.local_out_path, sync_dir, date)
                     if os.path.exists(src_sync):
                         shutil.copytree(src_sync, dst_sync, dirs_exist_ok=True)
-                        logger.info(f'  同步 {sync_dir} 到本地')
+                        logger.debug(f'  同步 {sync_dir} 到本地')
             except Exception as sync_e:
                 logger.warning(f'  同步到本地失败: {sync_e}')
 
