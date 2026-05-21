@@ -20,13 +20,13 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 from pathlib import Path
-
 # 自动把 D:\code 加入 Python 搜索路径
 sys.path.append(str(Path(__file__).parent.parent))
 
 # add_factor 延迟导入：rqfactors 在 import 时就会调 rqdatac API，
 # 必须等 rqdatac.init() 之后才能安全导入（见 _get_model_data_and_deal 方法内）
 from ultis.email_manager import EmailManager
+from ultis.rq_date_request import *
 from ultis.stock_data_client import StockDataClient
 import ultis.portfolio_optimizer_re_test as portfolio_optimizer
 import ultis.factor_explosure_test as factor_explosure
@@ -615,9 +615,11 @@ if __name__ == '__main__':
     logger.info('rqdatac 初始化完成')
 
     date = sys.argv[1] if len(sys.argv) > 1 else config.get('date')
-    logger.info(f'tranform_target 启动 | 日期={date}')
 
-    tt = TransformTarget(config, date)
-    tt.main()
+    # 判断是否为交易日
+    ddp = DateDealProcess()
+    if ddp.judge_trading_date(date):
+        tt = TransformTarget(config, date)
+        tt.main()
 
-    logger.info('tranform_target 全部完成')
+        logger.info('tranform_target 全部完成')

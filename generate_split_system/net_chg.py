@@ -27,6 +27,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 # 导入邮件管理器（原项目模块）
 from ultis.email_manager import EmailManager
+from ultis.rq_date_request import *
 
 # 配置日志
 logging.basicConfig(
@@ -145,7 +146,7 @@ class MarketDataFetcher:
             fut_df = self._fill_futures_with_minute_data(fut_df, codes)
         return fut_df.set_index('code')
 
-    def _fill_futures_with_minute_data(self, fut_df: pd.DataFrame, codes: List[str]) -> pd.DataFrame:
+    def _fill_futures_with_minute_data(self, fut_df: pd.DataFrame, codes: List[str], paths: str=None) -> pd.DataFrame:
         """使用分钟线数据补充期货信息（原有逻辑完整保留）"""
         # 获取前一日日线数据
         prev_df = rqdatac.get_price(
@@ -159,7 +160,10 @@ class MarketDataFetcher:
         fut_df = pd.merge(fut_df, prev_df, on='code', how='left')
 
         # 读取盘中分钟线数据（假设文件存在）
-        minute_file = f'/home/zhanggh/testscripts/test_data/{self.date}_data.csv'
+        # E:\code\generate_split_system\data\raw\real_minute
+        # minute_file = f'/home/zhanggh/testscripts/test_data/{self.date}_data.csv'
+        minute_file = rf'E:\code\generate_split_system\data\raw\real_minute\{self.date}_data.csv'
+        # minute_file = paths
         if not os.path.exists(minute_file):
             logger.error(f"分钟线数据文件不存在: {minute_file}")
             return fut_df
@@ -918,8 +922,12 @@ def main():
     date = config_mgr.get_date()
 
     # 可手动指定日期（原代码中有硬编码，保留灵活性）
-    date = '20260520'   # 如需固定日期可取消注释
+    # date = '20260520'   # 如需固定日期可取消注释
 
+    # 判断是否为交易日
+    ddp = DateDealProcess()
+    if not ddp.judge_trading_date(date):
+        return
 
     # 初始化rqdatac
     rqdatac_config = config.get('rqdatac')

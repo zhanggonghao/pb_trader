@@ -216,7 +216,7 @@ class SplitSystem(object):
         new_target_value = (data['target1'] * data['close']).sum()
         added_value = new_target_value - target_value
         direction_label = '买入' if direction == 1 else '卖出'
-        self._logger.debug(
+        self._logger.info(
             f'  偏差修正: {direction_label} {added_value:.0f}元, 目标市值 {new_target_value:.0f}')
         return data, new_target_value, added_value
 
