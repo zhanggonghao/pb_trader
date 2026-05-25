@@ -576,13 +576,8 @@ class ReportCalculator:
         返回:
             dict: 市场回顾指标
         """
-        print('market_data')
-        print(market_data)
         if not market_data:
             return None
-
-        # print('market_data')
-        # print(market_data)
 
         result = {}
 
@@ -601,6 +596,7 @@ class ReportCalculator:
                 start_val = start_val['close']
                 end_val = end_val['close']
             return (end_val / start_val - 1) if start_val else None
+
         result['sh_index_return'] = calc_return(market_data.get('sh_index'), prev_date, end_date)
         result['hs300_return'] = calc_return(market_data.get('hs300'), prev_date, end_date)
         result['zz500_return'] = calc_return(market_data.get('zz500'), prev_date, end_date)
@@ -611,14 +607,27 @@ class ReportCalculator:
         result['sh_index_close'] = market_data.get('sh_index', {}).get(end_date, {}).get('close')
         result['hs300_close'] = market_data.get('hs300', {}).get(end_date)
 
-        # 3. 期货涨跌幅
-        result['if_return'] = calc_return(market_data.get('if2606'), prev_date, end_date)
-        result['ic_return'] = calc_return(market_data.get('ic2606'), prev_date, end_date)
-        result['im_return'] = calc_return(market_data.get('im2606'), prev_date, end_date)
+        # 3. 期货涨跌幅（自动匹配合约key）
+        # 从market_data中自动发现期货合约（if/ic/im开头）
+        _fut_keys = {}
+        for _prefix in ['if', 'ic', 'im']:
+            _matched = sorted([k for k in market_data.keys() if k.startswith(_prefix)])
+            if _matched:
+                _fut_keys[f'{_prefix}_near'] = _matched[0]      # 当月合约
+                _fut_keys[f'{_prefix}_far'] = _matched[-1]       # 最远季月合约
+
+        _if_near = _fut_keys.get('if_near', 'if2605')
+        _if_far  = _fut_keys.get('if_far', 'if2612')
+        _ic_near = _fut_keys.get('ic_near', 'ic2605')
+        _im_near = _fut_keys.get('im_near', 'im2605')
+
+        result['if_return'] = calc_return(market_data.get(_if_near), prev_date, end_date)
+        result['ic_return'] = calc_return(market_data.get(_ic_near), prev_date, end_date)
+        result['im_return'] = calc_return(market_data.get(_im_near), prev_date, end_date)
 
         # 4. 期货期末价格（用于计算基差）
-        result['if_close'] = market_data.get('if2606', {}).get(end_date)
-        result['if_far_close'] = market_data.get('if2612', {}).get(end_date)  # 最远月合约
+        result['if_close'] = market_data.get(_if_near, {}).get(end_date)
+        result['if_far_close'] = market_data.get(_if_far, {}).get(end_date)
 
         # 5. 计算当月合约基差（IF升贴水）
         if result['hs300_close'] and result['if_close']:
@@ -638,22 +647,18 @@ class ReportCalculator:
 
         # 7. 计算基差变化（期初 vs 期末）
         hs300_start = market_data.get('hs300', {}).get(prev_date)
-        if2606_start = market_data.get('if2606', {}).get(prev_date)
-        if2612_start = market_data.get('if2612', {}).get(prev_date)
+        _fut_near_data = market_data.get(_if_near, {})
+        _fut_far_data = market_data.get(_if_far, {})
+        _fut_near_start = _fut_near_data.get(prev_date)
+        _fut_far_start = _fut_far_data.get(prev_date)
 
-        # 当月合约基差变化
-        if hs300_start and if2606_start and result['hs300_close'] and result['if_close']:
-            basis_start = hs300_start - if2606_start
-            basis_end = result['hs300_close'] - result['if_close']
-            result['basis_change'] = basis_end - basis_start
+        if hs300_start and _fut_near_start and result['hs300_close'] and result['if_close']:
+            result['basis_change'] = (result['hs300_close'] - result['if_close']) - (hs300_start - _fut_near_start)
         else:
             result['basis_change'] = None
 
-        # 最远月合约基差变化
-        if hs300_start and if2612_start and result['hs300_close'] and result['if_far_close']:
-            basis_far_start = hs300_start - if2612_start
-            basis_far_end = result['hs300_close'] - result['if_far_close']
-            result['basis_far_change'] = basis_far_end - basis_far_start
+        if hs300_start and _fut_far_start and result['hs300_close'] and result['if_far_close']:
+            result['basis_far_change'] = (result['hs300_close'] - result['if_far_close']) - (hs300_start - _fut_far_start)
         else:
             result['basis_far_change'] = None
 

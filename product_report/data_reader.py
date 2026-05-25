@@ -32,6 +32,12 @@ class DataReader:
         self.report_dates = self._get_trading_dates(config.REPORT_START, config.REPORT_END)
         self.prev_date = prev_date  # 由外部通过米筐获取后传入
 
+    def set_trading_calendar(self, trading_dates):
+        """用米筐真实交易日历覆盖本地计算的日期"""
+        if trading_dates:
+            print(f"  使用米筐交易日历: {len(trading_dates)}个交易日")
+            self.report_dates = trading_dates
+
     def _get_trading_dates(self, start, end):
         """获取交易日列表"""
         dates = []
@@ -55,11 +61,29 @@ class DataReader:
         return [self.prev_date] + self.report_dates
 
     def load_net_email_nav(self, date_str):
-        """从净值邮件Excel读取产品净值"""
-        filename = f"【基金净值】SAXM36_配邦恒升中性1号私募证券投资基金_{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}.xlsx"
-        filepath = os.path.join(config.NET_EMAIL_DIR, filename)
-        if not os.path.exists(filepath):
-            return None
+        """从净值邮件Excel读取产品净值（自动匹配文件名）"""
+        # 先用精确文件名匹配
+        exact_filename = f"【基金净值】SAXM36_配邦恒升中性1号私募证券投资基金_{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}.xlsx"
+        filepath = os.path.join(config.NET_EMAIL_DIR, exact_filename)
+        if os.path.exists(filepath):
+            return self._read_nav_from_excel(filepath)
+
+        # 失败后用 glob 模糊匹配：按日期查找目录下所有 xlsx
+        patterns = [
+            f"*{date_str}*.xlsx",
+            f"*{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}*.xlsx",
+            f"*{date_str[:4]}{date_str[4:6]}{date_str[6:]}*.xlsx",
+        ]
+        for pattern in patterns:
+            search_path = os.path.join(config.NET_EMAIL_DIR, pattern)
+            files = sorted(glob.glob(search_path))
+            if files:
+                return self._read_nav_from_excel(files[0])
+
+        return None
+
+    def _read_nav_from_excel(self, filepath):
+        """从Excel中读取净值数值"""
         try:
             import openpyxl
             wb = openpyxl.load_workbook(filepath)
@@ -158,7 +182,6 @@ class DataReader:
         for acc in accounts:
             data['stk_accounts'][self.prev_date][acc] = self.load_stk_account_info(self.prev_date, acc)
         data['fut'][self.prev_date] = self.load_fut_info(self.prev_date)
-        # print(data)
 
         return data
 

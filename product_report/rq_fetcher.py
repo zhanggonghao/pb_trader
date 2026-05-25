@@ -13,6 +13,82 @@ def normalize_date_for_rq(date_str):
     return date_str
 
 
+
+def get_futures_contract_codes(base_date_str):
+    """
+    根据基准日期自动计算股指期货合约代码
+    
+    中金所股指期货（IF/IC/IM）挂牌规则：当月、下月、随后两个季月
+    季月循环：3月、6月、9月、12月
+    
+    参数:
+        base_date_str: 基准日期 YYYYMMDD（通常是报告期最后一天）
+    
+    返回:
+        dict: {
+            'near': [IF代码, IC代码, IM代码],   # 当月合约
+            'far':  [IF代码, IC代码, IM代码],   # 最远季月合约
+        }
+    """
+    from datetime import datetime
+    
+    dt = datetime.strptime(base_date_str, '%Y%m%d')
+    year, month = dt.year, dt.month
+    
+    quarterly = [3, 6, 9, 12]
+    
+    # 当月合约 month1
+    # 判断当月合约是否已到期（第三个星期五）
+    # 到期后使用下月合约作为近月，否则当月合约无法获取数据
+    import calendar
+    _first_day = datetime(year, month, 1)
+    _days_to_fri = (4 - _first_day.weekday()) % 7
+    _third_friday = _first_day + __import__('datetime').timedelta(days=_days_to_fri + 14)
+    if dt > _third_friday:
+        if month == 12:
+            _near_month = 1
+            _near_year = year + 1
+        else:
+            _near_month = month + 1
+            _near_year = year
+    else:
+        _near_month = month
+        _near_year = year
+    
+
+    y1, m1 = _near_year, _near_month
+
+    # 下月合约 month2
+    if _near_month == 12:
+        y2, m2 = _near_year + 1, 1
+    else:
+        y2, m2 = _near_year, _near_month + 1
+
+    # 第一个季月（>= 下月）month3
+    for q in quarterly:
+        if q > m2:
+            y3, m3 = y2, q
+            break
+    else:
+        y3, m3 = y2 + 1, quarterly[0]
+
+    # 第二个季月（最远月）month4
+    idx = quarterly.index(m3)
+    if idx + 1 < len(quarterly):
+        y4, m4 = y3, quarterly[idx + 1]
+    else:
+        y4, m4 = y3 + 1, quarterly[0]
+
+    def _make_codes(y, m):
+        suffix = f'{y % 100:02d}{m:02d}'
+        return [f'IF{suffix}', f'IC{suffix}', f'IM{suffix}']
+
+    return {
+        'near': _make_codes(y1, m1),
+        'far':  _make_codes(y4, m4),
+    }
+
+
 class RQDataFetcher:
     def __init__(self):
         self.connected = False
@@ -357,6 +433,13 @@ class RQDataFetcher:
             self.reconnect()
             return None
 
+    def _last_date_str(self, dates):
+        """从日期列表中取最后一个交易日"""
+        if not dates:
+            from datetime import datetime
+            return datetime.now().strftime('%Y%m%d')
+        return dates[-1]
+
     def get_market_overview_data(self, dates):
         """
         获取市场宏观数据（用于市场回顾文字）
@@ -461,39 +544,24 @@ class RQDataFetcher:
             except Exception as e:
                 print(f"获取创业板指失败: {e}")
 
-            # 6. 股指期货（当月合约）
-            for fut_code in ['IF2606', 'IC2606', 'IM2606']: # 待修改成自动获取
-                try:
-                    df_fut = self.client.get_price(
-                        fut_code,
-                        start_date=start_date, end_date=end_date,
-                        fields=['close']
-                    )
-                    if df_fut is not None and not df_fut.empty:
-                        result[fut_code.lower()] = {}
-                        for idx in df_fut.index:
-                            date_obj = idx[1] if isinstance(idx, tuple) else idx
-                            date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
-                            result[fut_code.lower()][date_str] = float(df_fut.loc[idx, 'close'])
-                except Exception as e:
-                    print(f"获取{fut_code}失败: {e}")
-
-            # 7. 股指期货（最远月/季月合约）
-            for fut_code in ['IF2612', 'IC2612', 'IM2612']:
-                try:
-                    df_fut = self.client.get_price(
-                        fut_code,
-                        start_date=start_date, end_date=end_date,
-                        fields=['close']
-                    )
-                    if df_fut is not None and not df_fut.empty:
-                        result[fut_code.lower()] = {}
-                        for idx in df_fut.index:
-                            date_obj = idx[1] if isinstance(idx, tuple) else idx
-                            date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
-                            result[fut_code.lower()][date_str] = float(df_fut.loc[idx, 'close'])
-                except Exception as e:
-                    print(f"获取{fut_code}失败: {e}")
+            # 6. 股指期货（自动获取合约代码）
+            fut_codes = get_futures_contract_codes(self._last_date_str(dates))
+            for label, codes in [('当月合约', fut_codes['near']), ('最远季月合约', fut_codes['far'])]:
+                for fut_code in codes:
+                    try:
+                        df_fut = self.client.get_price(
+                            fut_code,
+                            start_date=start_date, end_date=end_date,
+                            fields=['close']
+                        )
+                        if df_fut is not None and not df_fut.empty:
+                            result[fut_code.lower()] = {}
+                            for idx in df_fut.index:
+                                date_obj = idx[1] if isinstance(idx, tuple) else idx
+                                date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                                result[fut_code.lower()][date_str] = float(df_fut.loc[idx, 'close'])
+                    except Exception as e:
+                        print(f"获取{fut_code}({label})失败: {e}")
 
             return result if result else None
 

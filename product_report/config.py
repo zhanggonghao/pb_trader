@@ -14,8 +14,8 @@ import os
 # ==============================================================================
 # 基础路径配置
 # ==============================================================================
-input_path = r'E:\code\generate_split_system\data' # 交易机挂载目录
-BASE_DIR = r"E:\code\product_report"
+input_path = r'Y:\data'
+BASE_DIR = r"D:\pb_trader\product_report"
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 TEMP_DATA_DIR = os.path.join(BASE_DIR, "temp_data")
 INTERMEDIATE_DATA_DIR = os.path.join(OUTPUT_DIR, "intermediate_data")
@@ -160,7 +160,7 @@ class PDFConfig:
     # 模块显示控制
     SHOW_MODULE1 = True  # 一、周期净值信息
     SHOW_MODULE2 = True  # 二、每日收益明细
-    SHOW_MODULE3 = False  # 三、多空详情（已禁用）
+    SHOW_MODULE3 = True   # 三、多空详情
     SHOW_MODULE4 = True  # 四、每日个股权重Top10
     SHOW_MODULE5 = True  # 五、持仓集中度
     SHOW_MODULE6 = True  # 六、因子风格敞口

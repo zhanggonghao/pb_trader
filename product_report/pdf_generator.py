@@ -61,7 +61,7 @@ def format_money(value, decimals=2):
     """格式化金额"""
     if value is None:
         return '-'
-    return f"¥{value:,.{decimals}f}"
+    return f"{value:,.{decimals}f}"
 
 
 def format_date_str(date_str):
@@ -233,7 +233,7 @@ class PDFGenerator:
         norm_bench = []
         if bench_values[0] and bench_values[0] > 0:
             base_bench = bench_values[0]
-            norm_bench = [v / base_bench * nav_values[0] if v else None for v in bench_values]
+            norm_bench = [v / base_bench * (nav_values[0] or 0) if v else None for v in bench_values]
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6),
                                         gridspec_kw={'height_ratios': [3, 1]})
@@ -348,7 +348,7 @@ class PDFGenerator:
         if not all_data or len(all_data) == 0:
             return None
 
-        headers = ['日期', '账户', '收益率', '超额', '收益(¥)', '净资产(¥)']
+        headers = ['日期', '账户', '收益率', '超额', '收益()', '净资产()']
         data = [headers] + all_data
 
         col_widths = [(self.page_width - 2 * self.margin) / 6] * 6
@@ -376,7 +376,7 @@ class PDFGenerator:
         all_tables = []
 
         for date_str, data in module4_data.items():
-            headers = ['序号', '股票代码', '持股数', '市值(¥)', '权重']
+            headers = ['序号', '股票代码', '持股数', '市值()', '权重']
 
             rows = []
             for i, item in enumerate(data['top10']):
@@ -906,8 +906,7 @@ class PDFGenerator:
 
         self.generate_module1(calc_result, market_review_data)
         self.generate_module2(module2_data, module3_data)
-        # 暂时跳过模块3 - 多空详情
-        # self.generate_module3(module3_data, dates)
+        self.generate_module3(module3_data, dates)
         self.generate_module4(module4_data)
         self.generate_module5(module5_data)
         self.generate_module7(module7_data)
