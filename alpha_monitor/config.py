@@ -61,15 +61,15 @@ class AppConfig:
 
     futures: list = field(default_factory=lambda: [
         FutureProductConfig(name="IF", spot_index="000300.XSHG", point_value=300,
-                            contracts=["IF2506", "IF2509", "IF2512", "IF2603"]),
+                            contracts=["IF2506", "IF2509", "IF2512", "IF2607"]),
         FutureProductConfig(name="IH", spot_index="000016.XSHG", point_value=300,
-                            contracts=["IH2506", "IH2509", "IH2512", "IH2603"]),
+                            contracts=["IH2506", "IH2509", "IH2512", "IH2607"]),
         FutureProductConfig(name="IC", spot_index="000905.XSHG", point_value=200,
-                            contracts=["IC2506", "IC2509", "IC2512", "IC2603"]),
+                            contracts=["IC2506", "IC2509", "IC2512", "IC2607"]),
         FutureProductConfig(name="IM", spot_index="000852.XSHG", point_value=200,
-                            contracts=["IM2506", "IM2509", "IM2512", "IM2603"]),
+                            contracts=["IM2506", "IM2509", "IM2512", "IM2607"]),
     ])
-
+    # deposit，入金为正，出金为负
     accounts: list = field(default_factory=lambda: [
         AccountConfig(
             name="海通PBZS1H",
@@ -77,7 +77,7 @@ class AppConfig:
             qmt_dir=r"E:\qmt_auto_export\SHPB0649",
             account_type="stock",
             account_id="132803",
-            target_file_path=r"E:\code\generate_split_system\data\target\{date}\{date}_TCHMD_000300.XSHG_zz1800_target.csv",
+            target_file_path=r"E:\code\generate_split_system\data\target\{date}\{date}_WBZD_000300.XSHG_zz1800_target.csv",
             deposit=0,
             net_value_source="file",
             net_value_file_pattern="email/资产净值公告_*_配邦中圣私募证券投资基金_*.xlsx"
@@ -89,7 +89,7 @@ class AppConfig:
         #     account_type="credit",
         #     account_id="60010146",
         #     target_file_path=r"E:\code\generate_split_system\data\target\{date}\{date}_TCHMD_000300.XSHG_zz1800_target.csv",
-        #     deposit=0, # 出金金额为正，如今金额为负
+        #     deposit=0,
         #     net_value_source="file",
         #     net_value_file_pattern="email/【基金净值】SJE581_配邦投资二号私募证券投资基金_*.xlsx"
         # ),
@@ -101,6 +101,17 @@ class AppConfig:
             account_id="10510783",
             target_file_path=r"E:\code\generate_split_system\data\target\{date}\{date}_CZQZX300_000300.XSHG_000906.XSHG_target.csv",
             deposit=0,
+            net_value_source="file",
+            net_value_file_pattern="email/【基金净值】SJE581_配邦投资二号私募证券投资基金_*.xlsx"
+        ),
+        AccountConfig(
+            name="国泰海通PBHSZX2H",
+            short_name="PBHSZX2H_pb",
+            qmt_dir=r"E:\qmt_auto_export\SHPB0649",
+            account_type="stock",
+            account_id="10517038",
+            target_file_path=r"E:\code\generate_split_system\data\target\{date}\{date}_WBZD_000300.XSHG_zz1800_target.csv",
+            deposit=7500000,
             net_value_source="file",
             net_value_file_pattern="email/【基金净值】SJE581_配邦投资二号私募证券投资基金_*.xlsx"
         ),

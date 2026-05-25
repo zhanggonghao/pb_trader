@@ -562,6 +562,8 @@ class StandardTradeData:
             # data['algo'] = data['合同编号'].apply(lambda x: 't0' if x in all_nums else 'adj')
             # 前两种方式都没有，那就按照时间来分类
             data['algo'] = data['委托时间'].apply(lambda x: 't0' if str(x) > '09:35:00' else 'adj')
+            if acct == 'gtht_PBHSZX1H':
+                data['algo'] = 'adj'
 
             data['vendor'] = data['algo'].apply(lambda x: acct_info['adj_algo'] if x == 'adj' else acct_info['t0_algo'])
             print(data)

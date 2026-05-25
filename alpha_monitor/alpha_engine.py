@@ -347,7 +347,14 @@ def calculate_account_alpha(account_cfg) -> Optional[dict]:
                     "benchmark_return": 0, "excess_return": 0,
                     "valid": True, "no_prev": True}
         deposit = account_cfg.deposit
-        net_return = ((net_value + deposit) - prev_net_value) / prev_net_value * 100
+        # net_return = ((net_value + deposit) - prev_net_value) / prev_net_value * 100
+        # 入金
+        net_return = (net_value - (prev_net_value + deposit)) / (prev_net_value + deposit) * 100
+
+        #出金
+        net_return = (net_value - (prev_net_value + deposit)) / (prev_net_value + deposit) * 100
+
+
         bench_code = CONFIG.benchmark.code
         bench_price = mdata.get_index_price(bench_code)
         bench_prev_close = mdata.get_index_prev_close(bench_code)

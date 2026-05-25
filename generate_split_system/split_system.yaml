@@ -59,7 +59,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "ABCD"
-        adjust_value: 0
+        adjust_value: 80000
         pre_reduce_value: 0
         pre_build_value: 0
 
@@ -86,8 +86,35 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "WBZD"
-        adjust_value: 10000
+        adjust_value: -20000
         pre_reduce_value: 0
+        pre_build_value: 0
+
+  PBHSZX2H:
+    product_chinese_name: "配邦恒升中性2号"
+    product_type: "zx"
+    benchmark: "hs300"
+    fut_info:
+      GTJA: "886701059"
+    acct_info:
+      gtht_PBHSZX2H:
+        acct_chinese_name: "国泰海通配邦恒升中性2号"
+        acct_num: "10517038"
+        is_adj: true
+        rzrq: false
+        adj_client: "ATX"
+        adj_acct: "配邦恒升中性2号证券"
+        adj_algo: "KF"
+        adj_algo_starttime: "093000"
+        adj_algo_endtime: "093500"
+        is_t0: true
+        t0_client: "道和方舟"
+        t0_acct: "peibang-lr-71-hszx1"
+        t0_algo: "YR"
+        t0_algo_starttime: "093000"
+        t0_algo_endtime: "145500"
+        target_uid: "WBZD" # 无黑名单，无融资黑名单
+        adjust_value: 100000
         pre_build_value: 0
 
   PBHSZX1H:
@@ -116,7 +143,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "TCHMD"
-        adjust_value: 0
+        adjust_value: -30000
         pre_build_value: 0
       gtht_PBHSZX1H:
         acct_chinese_name: "国泰海通配邦恒升中性1号"
@@ -135,7 +162,7 @@ product_info:
         t0_algo_starttime: ""
         t0_algo_endtime: ""
         target_uid: "CZQZX300"
-        adjust_value: 100000
+        adjust_value: 0
         pre_build_value: 0
         # 该账户需从邮件下载外部权重文件
         download_target_email:
@@ -143,6 +170,7 @@ product_info:
           file_extensions: [".csv"]
           file_pattern: "ZX300_weight_{date}.csv"
           rename_to: "{date}_CZQZX300_000300.XSHG_000906.XSHG_target.csv"
+
 
   # # 华通香港账户（暂未启用）
   # HTHTPB:

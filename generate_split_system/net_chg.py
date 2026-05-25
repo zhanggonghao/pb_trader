@@ -654,7 +654,8 @@ class ProductNetCalculator:
 
         # 增长率
         net_growth_close = (net_assets_close - deposits) / pre_net_close - 1 if pre_net_close != 0 else np.nan
-        net_growth_settle = (net_assets_settle - deposits) / pre_net_settle - 1 if pre_net_settle != 0 else np.nan
+        # net_growth_settle = (net_assets_settle - deposits) / pre_net_settle - 1 if pre_net_settle != 0 else np.nan
+        net_growth_settle = (net_assets_settle - deposits) / pre_net_settle - 1 if pre_net_settle != 0 else net_assets_settle / (pre_net_settle + deposits) - 1
         benchmark_chg = self.index_df.loc[benchmark, 'chg'] if benchmark in self.index_df.index else np.nan
         if product == 'PBTZ2H':
             fut_diff = cta_diff
@@ -737,6 +738,8 @@ class ProductNetCalculator:
 
         cangwei = stk_lng_hold_value / stk_assets if stk_assets != 0 else 0.0
         stk_lng_alpha_tot_pnl = stk_lng_hold_act_pnl + stk_lng_adj_trade_act_pnl
+        # if acct == 'gtht_PBHSZX2H':
+        #     print(f'{stk_lng_hold_act_pnl}+{stk_lng_adj_trade_act_pnl}={stk_lng_alpha_tot_pnl}')
         stk_lng_alpha_tot_ret = stk_lng_alpha_tot_pnl / stk_lng_hold_value if stk_lng_hold_value != 0 else 0.0
         stk_lng_tot_pnl = stk_lng_alpha_tot_pnl + stk_lng_t0_trade_act_pnl
         stk_lng_tot_ret = stk_lng_tot_pnl / stk_lng_hold_value if stk_lng_hold_value != 0 else 0.0
