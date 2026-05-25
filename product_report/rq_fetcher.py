@@ -156,7 +156,6 @@ class RQDataFetcher:
                 start_date=start_date,
                 end_date=end_date
             )
-
             if df is None or df.empty:
                 return None
 
@@ -172,8 +171,8 @@ class RQDataFetcher:
                             result[factor][code] = float(df.loc[idx, factor])
                         except:
                             pass
-
             return result
+        
 
         except Exception as e:
             print(f"获取风格因子失败: {e}")
@@ -181,32 +180,37 @@ class RQDataFetcher:
             return None
 
     def get_industry_classification(self, stock_codes, date_str):
-        """获取行业分类"""
+        """获取申万一级行业分类"""
         if not self.connected:
             if not self.connect():
                 return None
 
         try:
-            start_date = normalize_date_for_rq(date_str)
-
+            rq_date = normalize_date_for_rq(date_str)
             valid_codes = [c for c in stock_codes if c and isinstance(c, str) and '.' in c]
 
             if not valid_codes:
                 return None
 
-            df = self.client.get_industry(
+            df = self.client.shenwan_instrument_industry(
                 valid_codes,
-                date=start_date,
-                source='sw'
+                date=rq_date,
+                level=1,
+                expect_df=True
             )
 
             if df is None or df.empty:
                 return None
 
             result = {}
-            for idx in df.index:
-                code = idx[0] if isinstance(idx, tuple) else idx
-                result[code] = str(df.loc[idx, 'industry_code'])
+            for code in df.index:
+                # 使用行业名称作为分类依据
+                if 'index_name' in df.columns:
+                    result[code] = str(df.loc[code, 'index_name'])
+                elif 'index_code' in df.columns:
+                    result[code] = str(df.loc[code, 'index_code'])
+                else:
+                    result[code] = str(df.iloc[0, 0])
 
             return result
 
@@ -223,12 +227,10 @@ class RQDataFetcher:
 
         try:
             const_date = normalize_date_for_rq(date_str)
-            print(const_date)
             df = self.client.index_weights_ex(
                 config.BENCHMARK_CODE,
                 start_date=const_date, end_date=const_date
             )
-            print(df)
 
             if df is None or df.empty:
                 return None
@@ -286,4 +288,215 @@ class RQDataFetcher:
         except Exception as e:
             print(f"获取基准因子暴露失败: {e}")
             self.reconnect()
+            return None
+
+    def get_previous_trading_date(self, date_str):
+        """获取指定日期的前一个交易日"""
+        if not self.connected:
+            if not self.connect():
+                return None
+
+        try:
+            rq_date = normalize_date_for_rq(date_str)
+            prev_date = self.client.get_previous_trading_date(rq_date)
+            if hasattr(prev_date, 'strftime'):
+                return prev_date.strftime('%Y%m%d')
+            return str(prev_date).replace('-', '')
+        except Exception as e:
+            print(f"获取前一交易日失败: {e}")
+            return None
+
+    def get_benchmark_industry_weights(self, date_str):
+        """获取基准指数的申万一级行业权重分布"""
+        if not self.connected:
+            if not self.connect():
+                return None
+
+        try:
+            codes = self.get_benchmark_constituents(date_str)
+            if not codes:
+                return None
+
+            # 获取成分股的行业分类
+            industry_map = self.get_industry_classification(codes, date_str)
+            if not industry_map:
+                return None
+
+            # 获取成分股权重
+            const_date = normalize_date_for_rq(date_str)
+            weight_df = self.client.index_weights_ex(
+                config.BENCHMARK_CODE,
+                start_date=const_date, end_date=const_date
+            )
+
+            if weight_df is None or weight_df.empty:
+                # 如果获取不到权重，使用等权近似
+                industry_weights = {}
+                for code, industry in industry_map.items():
+                    if industry:
+                        industry_weights[industry] = industry_weights.get(industry, 0) + 1.0
+                total = sum(industry_weights.values())
+                if total > 0:
+                    for k in industry_weights:
+                        industry_weights[k] /= total
+                return industry_weights
+
+            # 用实际权重汇总行业
+            industry_weights = {}
+            for idx in weight_df.index:
+                code = idx[1] if isinstance(idx, tuple) else idx
+                weight = float(weight_df.loc[idx, 'weight']) if 'weight' in weight_df.columns else 0
+                industry = industry_map.get(code)
+                if industry:
+                    industry_weights[industry] = industry_weights.get(industry, 0) + weight
+
+            return industry_weights
+
+        except Exception as e:
+            print(f"获取基准行业权重失败: {e}")
+            self.reconnect()
+            return None
+
+    def get_market_overview_data(self, dates):
+        """
+        获取市场宏观数据（用于市场回顾文字）
+        
+        参数:
+            dates: 日期列表，包含前一交易日和报告周期所有日期
+        
+        返回:
+            dict: 包含各指数价格、期货价格、成交额等数据
+        """
+        if not self.connected:
+            if not self.connect():
+                return None
+
+        try:
+            start_date = normalize_date_for_rq(dates[0])
+            end_date = normalize_date_for_rq(dates[-1])
+
+            result = {}
+
+            # 1. 上证指数
+            try:
+                df_sh = self.client.get_price(
+                    '000001.XSHG',
+                    start_date=start_date, end_date=end_date,
+                    fields=['close', 'volume', 'total_turnover']
+                )
+                if df_sh is not None and not df_sh.empty:
+                    result['sh_index'] = {}
+                    for idx in df_sh.index:
+                        date_obj = idx[1] if isinstance(idx, tuple) else idx
+                        date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                        result['sh_index'][date_str] = {
+                            'close': float(df_sh.loc[idx, 'close']),
+                            'volume': float(df_sh.loc[idx, 'volume']),
+                            'turnover': float(df_sh.loc[idx, 'total_turnover']),
+                        }
+            except Exception as e:
+                print(f"获取上证指数失败: {e}")
+
+            # 2. 沪深300
+            try:
+                df_hs300 = self.client.get_price(
+                    '000300.XSHG',
+                    start_date=start_date, end_date=end_date,
+                    fields=['close']
+                )
+                if df_hs300 is not None and not df_hs300.empty:
+                    result['hs300'] = {}
+                    for idx in df_hs300.index:
+                        date_obj = idx[1] if isinstance(idx, tuple) else idx
+                        date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                        result['hs300'][date_str] = float(df_hs300.loc[idx, 'close'])
+            except Exception as e:
+                print(f"获取沪深300失败: {e}")
+
+            # 3. 中证500
+            try:
+                df_zz500 = self.client.get_price(
+                    '000905.XSHG',
+                    start_date=start_date, end_date=end_date,
+                    fields=['close']
+                )
+                if df_zz500 is not None and not df_zz500.empty:
+                    result['zz500'] = {}
+                    for idx in df_zz500.index:
+                        date_obj = idx[1] if isinstance(idx, tuple) else idx
+                        date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                        result['zz500'][date_str] = float(df_zz500.loc[idx, 'close'])
+            except Exception as e:
+                print(f"获取中证500失败: {e}")
+
+            # 4. 中证1000
+            try:
+                df_zz1000 = self.client.get_price(
+                    '000852.XSHG',
+                    start_date=start_date, end_date=end_date,
+                    fields=['close']
+                )
+                if df_zz1000 is not None and not df_zz1000.empty:
+                    result['zz1000'] = {}
+                    for idx in df_zz1000.index:
+                        date_obj = idx[1] if isinstance(idx, tuple) else idx
+                        date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                        result['zz1000'][date_str] = float(df_zz1000.loc[idx, 'close'])
+            except Exception as e:
+                print(f"获取中证1000失败: {e}")
+
+            # 5. 创业板指
+            try:
+                df_cyb = self.client.get_price(
+                    '399006.XSHE',
+                    start_date=start_date, end_date=end_date,
+                    fields=['close']
+                )
+                if df_cyb is not None and not df_cyb.empty:
+                    result['cyb'] = {}
+                    for idx in df_cyb.index:
+                        date_obj = idx[1] if isinstance(idx, tuple) else idx
+                        date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                        result['cyb'][date_str] = float(df_cyb.loc[idx, 'close'])
+            except Exception as e:
+                print(f"获取创业板指失败: {e}")
+
+            # 6. 股指期货（当月合约）
+            for fut_code in ['IF2606', 'IC2606', 'IM2606']: # 待修改成自动获取
+                try:
+                    df_fut = self.client.get_price(
+                        fut_code,
+                        start_date=start_date, end_date=end_date,
+                        fields=['close']
+                    )
+                    if df_fut is not None and not df_fut.empty:
+                        result[fut_code.lower()] = {}
+                        for idx in df_fut.index:
+                            date_obj = idx[1] if isinstance(idx, tuple) else idx
+                            date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                            result[fut_code.lower()][date_str] = float(df_fut.loc[idx, 'close'])
+                except Exception as e:
+                    print(f"获取{fut_code}失败: {e}")
+
+            # 7. 股指期货（最远月/季月合约）
+            for fut_code in ['IF2612', 'IC2612', 'IM2612']:
+                try:
+                    df_fut = self.client.get_price(
+                        fut_code,
+                        start_date=start_date, end_date=end_date,
+                        fields=['close']
+                    )
+                    if df_fut is not None and not df_fut.empty:
+                        result[fut_code.lower()] = {}
+                        for idx in df_fut.index:
+                            date_obj = idx[1] if isinstance(idx, tuple) else idx
+                            date_str = date_obj.strftime('%Y%m%d') if hasattr(date_obj, 'strftime') else str(date_obj).replace('-', '')
+                            result[fut_code.lower()][date_str] = float(df_fut.loc[idx, 'close'])
+                except Exception as e:
+                    print(f"获取{fut_code}失败: {e}")
+
+            return result if result else None
+
+        except Exception as e:
+            print(f"获取市场宏观数据失败: {e}")
             return None

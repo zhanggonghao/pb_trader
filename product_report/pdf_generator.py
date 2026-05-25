@@ -257,19 +257,20 @@ class PDFGenerator:
                 ax1.annotate(f'{nav:.4f}', (i, nav), textcoords="offset points",
                             xytext=(0, 10), ha='center', fontsize=8, color='blue')
 
-        peak = max([v for v in nav_values if v])
-        peak_idx = nav_values.index(peak) if peak in nav_values else 0
-
+        # 正确的回撤计算：running_peak初始化为第一个净值，遍历时动态更新
         drawdowns = []
-        running_peak = peak
-        for v in nav_values:
-            if v:
-                if v > running_peak:
-                    running_peak = v
-                dd = (running_peak - v) / running_peak if running_peak > 0 else 0
-                drawdowns.append(dd)
-            else:
-                drawdowns.append(None)
+        if nav_values and nav_values[0]:
+            running_peak = nav_values[0]  # 初始化为第一个净值
+            for v in nav_values:
+                if v:
+                    if v > running_peak:
+                        running_peak = v  # 更新历史峰值
+                    dd = (running_peak - v) / running_peak if running_peak > 0 else 0
+                    drawdowns.append(dd)
+                else:
+                    drawdowns.append(None)
+        else:
+            drawdowns = [0] * len(nav_values)
 
         ax2.fill_between(x, drawdowns, 0, alpha=0.3, color='gray', step='mid')
         ax2.plot(x, drawdowns, 'gray', linewidth=1)
@@ -505,8 +506,8 @@ class PDFGenerator:
         """创建因子风格敞口图表（按因子分组，每个因子一张图）"""
         all_charts = []
 
-        # 使用配置中的因子名称映射
-        factors_cn = config.CalculationParams.FACTOR_CN_NAMES
+        # 使用新的因子配置中的因子名称映射
+        factors_cn = config.FactorConfig.SELECTED_FACTORS
 
         dates = sorted(module6_data.keys())
         if not dates:
@@ -523,29 +524,22 @@ class PDFGenerator:
                 portfolio_vals.append(portfolio.get(factor_en, 0))
                 benchmark_vals.append(benchmark.get(factor_en, 0))
 
-            fig, ax1 = plt.subplots(figsize=(10, 4))
+            fig, ax = plt.subplots(figsize=(10, 4))
 
             x = np.arange(len(dates))
 
-            ax1.plot(x, portfolio_vals, marker='o', label='组合', color=self.accent_color, linewidth=2)
-            ax1.set_xlabel('日期', fontsize=10)
-            ax1.set_ylabel('组合因子暴露', fontsize=10, color=self.accent_color)
-            ax1.set_title(f'{factor_cn} 因子敞口', fontsize=11, fontweight='bold')
-            ax1.set_xticks(x)
-            ax1.set_xticklabels(dates, fontsize=9)
-            ax1.tick_params(axis='y', labelcolor=self.accent_color)
-            ax1.grid(axis='y', alpha=0.3)
-            ax1.axhline(y=0, color='black', linewidth=0.5)
-
-            ax2 = ax1.twinx()
-            ax2.plot(x, benchmark_vals, marker='s', label='基准', color='#e74c3c', linewidth=2)
-            ax2.set_ylabel('基准因子暴露', fontsize=10, color='#e74c3c')
-            ax2.tick_params(axis='y', labelcolor='#e74c3c')
-            ax2.axhline(y=0, color='black', linewidth=0.5)
-
-            lines1, labels1 = ax1.get_legend_handles_labels()
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right', fontsize=9)
+            # 使用单个纵坐标轴绘制组合和基准
+            ax.plot(x, portfolio_vals, marker='o', label='组合', color=self.accent_color, linewidth=2)
+            ax.plot(x, benchmark_vals, marker='s', label='基准', color='#e74c3c', linewidth=2)
+            
+            ax.set_xlabel('日期', fontsize=10)
+            ax.set_ylabel('因子暴露', fontsize=10)
+            ax.set_title(f'{factor_cn} 因子敞口', fontsize=11, fontweight='bold')
+            ax.set_xticks(x)
+            ax.set_xticklabels(dates, fontsize=9)
+            ax.grid(axis='y', alpha=0.3)
+            ax.axhline(y=0, color='black', linewidth=0.5)
+            ax.legend(loc='upper right', fontsize=9)
 
             plt.tight_layout()
 
@@ -559,7 +553,127 @@ class PDFGenerator:
 
         return all_charts
 
-    def generate_module1(self, calc_result):
+    def generate_market_review_text(self, market_review_data, calc_result):
+        """生成市场回顾文字段落"""
+        if not market_review_data:
+            return ""
+        
+        # 格式化百分比
+        def fmt_pct(val):
+            if val is None:
+                return "--"
+            return f"{val * 100:.2f}%"
+        
+        # 格式化数字（指数点位）
+        def fmt_num(val):
+            if val is None:
+                return "--"
+            return f"{val:.2f}"
+        
+        # 获取数据
+        sh_return = market_review_data.get('sh_index_return')
+        hs300_return = market_review_data.get('hs300_return')
+        zz500_return = market_review_data.get('zz500_return')
+        zz1000_return = market_review_data.get('zz1000_return')
+        cyb_return = market_review_data.get('cyb_return')
+        
+        sh_close = market_review_data.get('sh_index_close')
+        hs300_close = market_review_data.get('hs300_close')
+        
+        if_return = market_review_data.get('if_return')
+        ic_return = market_review_data.get('ic_return')
+        im_return = market_review_data.get('im_return')
+        
+        basis = market_review_data.get('basis')
+        basis_pct = market_review_data.get('basis_pct')
+        basis_far = market_review_data.get('basis_far')
+        basis_change = market_review_data.get('basis_change')
+        basis_far_change = market_review_data.get('basis_far_change')
+        
+        avg_turnover = market_review_data.get('avg_turnover')
+        
+        stk_contrib = market_review_data.get('total_stk_contrib')
+        fut_contrib = market_review_data.get('total_fut_contrib')
+        
+        # 产品数据
+        nav_growth = calc_result.get('nav_growth')
+        max_dd = calc_result.get('max_drawdown')
+        
+        # 辅助函数：涨跌描述
+        def up_down(val):
+            if val is None:
+                return ""
+            return "周期涨幅" if val >= 0 else "周期跌幅"
+        
+        # 计算超额收益和基差收益的具体数值（用于对比描述）
+        total_contrib = (stk_contrib if stk_contrib else 0) + (fut_contrib if fut_contrib else 0)
+        
+        # 生成超额收益和基差收益的对比描述
+        def generate_comparison_text(contrib, name):
+            """生成某一项收益与基准的对比描述"""
+            if contrib is None:
+                return ""
+            if contrib > 0:
+                return f"{name}为{contrib*100:.2f}%，"
+            elif contrib < 0:
+                return f"{name}为{contrib*100:.2f}%；"
+            else:
+                return f"{name}为0.00%，与基准持平；"
+        
+        # 生成收益归因描述（根据股票端和基差端的正负组合及总贡献）
+        def generate_contribution_text(stk, fut, total):
+            """根据股票端和基差端的正负情况及总贡献生成描述"""
+            if stk is None or fut is None:
+                return ""
+            
+            stk_positive = stk > 0
+            fut_positive = fut > 0
+            total_positive = total > 0 if total else False
+            
+            # 四种情况的完整覆盖
+            if stk_positive and fut_positive:
+                # 股票正，基差正
+                return "股票端超额贡献为正，基差端亦形成正向补充，共同推动产品净值上涨。"
+            elif stk_positive and not fut_positive:
+                # 股票正，基差负
+                if total_positive:
+                    return "股票端超额贡献为正，虽基差端贡献为负，但两者合计仍为正贡献，共同推动产品净值上涨。"
+                else:
+                    return "股票端超额贡献为正，但基差端贡献为负，两者合计为负贡献，未能完全形成正向补充。"
+            elif not stk_positive and fut_positive:
+                # 股票负，基差正
+                if total_positive:
+                    return "基差端贡献为正且完全对冲股票端超额亏损，两者合计为正贡献，共同推动产品净值上涨。"
+                else:
+                    return "基差端贡献为正但不足以弥补股票端超额亏损，两者合计为负贡献，共同拖累产品净值表现。"
+            else:
+                # 股票负，基差负
+                return "股票端超额亏损与基差端负贡献共同拖累产品净值表现。"
+        
+        comparison_text = generate_comparison_text(stk_contrib, "超额收益") + generate_comparison_text(fut_contrib, "基差收益")
+        contribution_text = generate_contribution_text(stk_contrib, fut_contrib, total_contrib)
+        
+        # 生成文字
+        text = f"<b>市场回顾</b><br/><br/>" \
+               f"周期内A股市场整体震荡{'走高' if (sh_return and sh_return >= 0) else '走低'}，大盘指数录得{'上涨' if (sh_return and sh_return >= 0) else '下跌'}。" \
+               f"上证指数收于{fmt_num(sh_close)}点，{up_down(sh_return)}{fmt_pct(sh_return)}；" \
+               f"沪深300指数收于{fmt_num(hs300_close)}点，{up_down(hs300_return)}{fmt_pct(hs300_return)}。" \
+               f"风格方面，大盘蓝筹{'表现优于' if (hs300_return and zz500_return and hs300_return > zz500_return) else '表现弱于'}中小盘，" \
+               f"中证500{up_down(zz500_return)}{fmt_pct(zz500_return)}，中证1000{up_down(zz1000_return)}{fmt_pct(zz1000_return)}，" \
+               f"创业板指{up_down(cyb_return)}{fmt_pct(cyb_return)}，市场呈现一定的风格分化特征。" \
+               f"两市日均成交额约{fmt_num(avg_turnover)}万亿元，显示市场交投情绪{'边际回暖' if (avg_turnover and avg_turnover > 1.0) else '相对平淡'}。<br/><br/>" \
+               f"股指期货方面，IF当月合约{up_down(if_return)}{fmt_pct(if_return)}，" \
+               f"基差{'收敛' if (basis_change and basis_change < 0) else '拉开' if (basis_change and basis_change > 0) else '变化不大'}；" \
+               f"最远月合约（IF2612）基差{'收敛' if (basis_far_change and basis_far_change < 0) else '拉开' if (basis_far_change and basis_far_change > 0) else '变化不大'}。" \
+               f"IC及IM合约分别{up_down(ic_return)}{fmt_pct(ic_return)}和{up_down(im_return)}{fmt_pct(im_return)}，中小盘期货贴水幅度未见显著扩大。<br/><br/>" \
+               f"产品方面，{config.REPORT_PRODUCT_NAME}周期内净值{up_down(nav_growth)}{fmt_pct(nav_growth)}，" \
+               f"最大回撤为{fmt_pct(max_dd)}。" \
+               f"从收益归因来看，周期内股票端超额贡献约{fmt_pct(stk_contrib)}，" \
+               f"期货基差端贡献约{fmt_pct(fut_contrib)}。{contribution_text}"
+        
+        return text
+
+    def generate_module1(self, calc_result, market_review_data=None):
         """生成模块1"""
         self.add_section_header("一、周期净值信息")
 
@@ -569,6 +683,15 @@ class PDFGenerator:
             ('净值回撤', format_pct(calc_result['max_drawdown']), '#c0392b'),
         ]
         self.add_kpi_cards(kpis)
+
+        # 添加市场回顾文字
+        if market_review_data:
+            review_text = self.generate_market_review_text(market_review_data, calc_result)
+            if review_text:
+                self.story.append(Spacer(1, 0.4 * cm))
+                review_para = Paragraph(review_text, self.body_style)
+                self.story.append(review_para)
+                self.story.append(Spacer(1, 0.4 * cm))
 
         chart_img = self.create_nav_chart(calc_result, calc_result['nav_dates'])
         img = Image(chart_img, width=(self.page_width - 2 * self.margin), height=(self.page_width - 2 * self.margin) * 0.6)
@@ -666,7 +789,7 @@ class PDFGenerator:
 
     def generate_module6(self, module6_data):
         """生成模块6"""
-        self.add_section_header("六、因子风格敞口")
+        self.add_section_header("七、因子风格敞口")
 
         charts = self.create_factor_chart(module6_data)
 
@@ -684,20 +807,110 @@ class PDFGenerator:
 
         self.story.append(PageBreak())
 
-    def build(self, calc_result, module2_data, module3_data, module4_data, module5_data, module6_data, dates):
+    def create_industry_comparison_chart(self, module7_data):
+        """创建行业对比图表（组合 vs 基准，按日期分图）"""
+        all_charts = []
+
+        dates = sorted(module7_data.keys())
+        if not dates:
+            return []
+
+        for d in dates:
+            data = module7_data[d]
+            portfolio_ind = data.get('portfolio_industry', {})
+            benchmark_ind = data.get('benchmark_industry', {})
+
+            if not portfolio_ind:
+                continue
+
+            # 合并所有行业
+            all_industries = sorted(set(list(portfolio_ind.keys()) + list(benchmark_ind.keys())))
+
+            if not all_industries:
+                continue
+
+            portfolio_vals = [portfolio_ind.get(ind, 0) * 100 for ind in all_industries]
+            benchmark_vals = [benchmark_ind.get(ind, 0) * 100 for ind in all_industries]
+            diff_vals = [p - b for p, b in zip(portfolio_vals, benchmark_vals)]
+
+            # 行业名称直接作为标签
+            labels = all_industries
+
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8),
+                                            gridspec_kw={'height_ratios': [3, 2]})
+
+            x = np.arange(len(all_industries))
+            bar_width = 0.35
+
+            # 上图：组合 vs 基准行业权重对比
+            bars1 = ax1.bar(x - bar_width / 2, portfolio_vals, bar_width,
+                           label='组合', color=self.accent_color, alpha=0.85)
+            bars2 = ax1.bar(x + bar_width / 2, benchmark_vals, bar_width,
+                           label='基准(沪深300)', color='#e74c3c', alpha=0.85)
+
+            ax1.set_ylabel('权重 (%)', fontsize=11)
+            ax1.set_title(f'{d} 行业分布对比（申万一级行业）', fontsize=13, fontweight='bold')
+            ax1.set_xticks(x)
+            ax1.set_xticklabels(labels, fontsize=8, rotation=45, ha='right')
+            ax1.legend(fontsize=10, loc='upper right')
+            ax1.grid(axis='y', alpha=0.3)
+
+            # 下图：行业偏离度
+            colors_diff = ['#27ae60' if v >= 0 else '#c0392b' for v in diff_vals]
+            ax2.bar(x, diff_vals, bar_width * 1.2, color=colors_diff, alpha=0.8)
+            ax2.axhline(y=0, color='black', linewidth=0.5)
+            ax2.set_ylabel('偏离度 (%)', fontsize=11)
+            ax2.set_xlabel('行业', fontsize=11)
+            ax2.set_title('行业偏离度（组合 - 基准）', fontsize=11, fontweight='bold')
+            ax2.set_xticks(x)
+            ax2.set_xticklabels(labels, fontsize=8, rotation=45, ha='right')
+            ax2.grid(axis='y', alpha=0.3)
+
+            plt.tight_layout()
+
+            img_buffer = BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight',
+                       facecolor='white', edgecolor='none')
+            plt.close()
+
+            img_buffer.seek(0)
+            all_charts.append((d, img_buffer))
+
+        return all_charts
+
+    def generate_module7(self, module7_data):
+        """生成模块7：行业对比"""
+        self.add_section_header("六、行业分布对比")
+
+        charts = self.create_industry_comparison_chart(module7_data)
+
+        for date_str, chart_img in charts:
+            img = Image(chart_img, width=(self.page_width - 2 * self.margin),
+                      height=(self.page_width - 2 * self.margin) * 0.55)
+            self.story.append(img)
+            self.story.append(Spacer(1, 0.3 * cm))
+
+        if not charts:
+            self.story.append(Paragraph("暂无行业数据", self.body_style))
+
+        self.story.append(PageBreak())
+
+    def build(self, calc_result, module2_data, module3_data, module4_data, module5_data, module6_data, module7_data, dates, market_review_data=None):
         """构建完整的PDF报告"""
         self.create_doc()
 
         period_str = f"{dates[0]} ~ {dates[-1]}"
         self.add_title_page(config.REPORT_PRODUCT_NAME, dates)
         self.story.append(PageBreak())
+        # print(self.story)
 
-        self.generate_module1(calc_result)
+        self.generate_module1(calc_result, market_review_data)
         self.generate_module2(module2_data, module3_data)
         # 暂时跳过模块3 - 多空详情
         # self.generate_module3(module3_data, dates)
         self.generate_module4(module4_data)
         self.generate_module5(module5_data)
+        self.generate_module7(module7_data)
         self.generate_module6(module6_data)
 
         self.doc.build(self.story)

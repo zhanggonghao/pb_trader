@@ -27,10 +27,10 @@ def date_to_plot_str(dt):
 
 
 class DataReader:
-    def __init__(self):
+    def __init__(self, prev_date=None):
         self.base_dir = config.BASE_DIR
         self.report_dates = self._get_trading_dates(config.REPORT_START, config.REPORT_END)
-        self.prev_date = config.REPORT_PREV
+        self.prev_date = prev_date  # 由外部通过米筐获取后传入
 
     def _get_trading_dates(self, start, end):
         """获取交易日列表"""
@@ -158,6 +158,7 @@ class DataReader:
         for acc in accounts:
             data['stk_accounts'][self.prev_date][acc] = self.load_stk_account_info(self.prev_date, acc)
         data['fut'][self.prev_date] = self.load_fut_info(self.prev_date)
+        # print(data)
 
         return data
 
@@ -169,3 +170,132 @@ class DataReader:
             if pos_df is not None:
                 positions[d] = pos_df
         return positions
+
+    def load_factor_exposure_from_parquet(self, date_str, factor_type='stock'):
+        """
+        从parquet文件读取因子暴露数据
+        
+        参数:
+            date_str: 日期字符串 (YYYYMMDD)
+            factor_type: 'stock' 或 'benchmark'
+        
+        返回:
+            DataFrame: 因子暴露数据，列包含 [code, lcap_exposure, liquidity_exposure, beta_exposure, ...]
+        """
+        try:
+            if factor_type == 'benchmark':
+                filepath = config.FactorConfig.BENCHMARK_FACTOR_PATH
+            else:
+                filepath = config.FactorConfig.STOCK_FACTOR_PATH
+            
+            if not os.path.exists(filepath):
+                print(f"  因子文件不存在: {filepath}")
+                return None
+            
+            # 读取parquet文件
+            df = pd.read_parquet(filepath)
+            
+            # 将日期列转换为字符串格式进行筛选
+            if 'date' in df.columns:
+                # 转换日期列为字符串 YYYYMMDD
+                df['date_str'] = pd.to_datetime(df['date']).dt.strftime('%Y%m%d')
+                df_filtered = df[df['date_str'] == date_str].copy()
+            else:
+                print(f"  因子文件缺少date列")
+                return None
+            
+            if df_filtered.empty:
+                print(f"  未找到 {date_str} 的因子数据")
+                return None
+            
+            # 对于股票因子，将 order_book_id 转换为 code 格式（去掉交易所后缀）
+            if factor_type == 'stock' and 'order_book_id' in df_filtered.columns:
+                df_filtered['code'] = df_filtered['order_book_id'].str.replace(r'\.XSH[EG]', '', regex=True)
+            
+            # 只保留需要的因子列
+            selected_factors = list(config.FactorConfig.SELECTED_FACTORS.keys())
+            # 检查因子列是否存在（code列是必需的，但不是因子列）
+            available_factor_cols = [c for c in selected_factors if c in df_filtered.columns]
+            missing_factors = set(selected_factors) - set(available_factor_cols)
+            
+            if missing_factors:
+                print(f"  缺少因子列: {missing_factors}")
+            
+            # 返回包含code（如果存在）和所有可用因子列的数据
+            return_cols = available_factor_cols.copy()
+            if 'code' in df_filtered.columns:
+                return_cols = ['code'] + return_cols
+            return df_filtered[return_cols]
+            
+        except Exception as e:
+            print(f"  读取因子文件失败: {e}")
+            return None
+
+    def calculate_portfolio_factor_exposure(self, date_str, positions_df):
+        """
+        计算组合持仓的加权因子暴露
+        
+        参数:
+            date_str: 日期字符串
+            positions_df: 持仓DataFrame，包含 [code, hold, market_value]
+        
+        返回:
+            dict: 各因子的加权暴露值
+        """
+        # 读取个股因子暴露
+        factor_df = self.load_factor_exposure_from_parquet(date_str, factor_type='stock')
+        if factor_df is None or positions_df is None:
+            return None
+        
+        # 将持仓数据的 code 列转换为字符串类型，确保与因子数据类型一致
+        positions_df_copy = positions_df.copy()
+        positions_df_copy['code'] = positions_df_copy['code'].astype(str)
+        factor_df['code'] = factor_df['code'].astype(str)
+        
+        # 合并持仓和因子数据
+        merged = positions_df_copy.merge(factor_df, on='code', how='inner')
+        if merged.empty:
+            print(f"  {date_str}: 持仓与因子数据无匹配")
+            return None
+        
+        # 计算市值权重
+        if 'market_value' not in merged.columns:
+            merged['market_value'] = merged['hold']  # 如果没有市值，用持仓量代替
+        
+        total_mv = merged['market_value'].sum()
+        if total_mv <= 0:
+            return None
+        
+        merged['weight'] = merged['market_value'] / total_mv
+        
+        # 计算加权因子暴露
+        result = {}
+        selected_factors = list(config.FactorConfig.SELECTED_FACTORS.keys())
+        for factor in selected_factors:
+            if factor in merged.columns:
+                result[factor] = (merged[factor] * merged['weight']).sum()
+        
+        return result
+
+    def get_benchmark_factor_exposure(self, date_str):
+        """
+        获取基准指数的因子暴露
+        
+        参数:
+            date_str: 日期字符串
+        
+        返回:
+            dict: 基准各因子的暴露值
+        """
+        factor_df = self.load_factor_exposure_from_parquet(date_str, factor_type='benchmark')
+        if factor_df is None or factor_df.empty:
+            return None
+        
+        # 基准数据通常只有一行或需要取平均
+        result = {}
+        selected_factors = list(config.FactorConfig.SELECTED_FACTORS.keys())
+        for factor in selected_factors:
+            if factor in factor_df.columns:
+                result[factor] = factor_df[factor].mean()
+        
+        return result

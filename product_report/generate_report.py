@@ -59,7 +59,7 @@ def _convert_stock_code(code):
     return f"{code_padded}.XSHE"
 
 
-def save_intermediate_data(calc_result, module2_data, module3_data, module4_data, module5_data, module6_data, daily_data, output_dir):
+def save_intermediate_data(calc_result, module2_data, module3_data, module4_data, module5_data, module6_data, module7_data, daily_data, output_dir):
     """
     保存中间数据到文件，方便核对
     
@@ -181,6 +181,22 @@ def save_intermediate_data(calc_result, module2_data, module3_data, module4_data
     with open(os.path.join(data_dir, "module6_factors.json"), 'w', encoding='utf-8') as f:
         json.dump(module6_data, f, ensure_ascii=False, indent=2)
 
+    # 模块7：行业对比数据
+    module7_flat = []
+    for date_str, data in module7_data.items():
+        for industry, weights in data.get('portfolio_industry', {}).items():
+            module7_flat.append({
+                'date': date_str,
+                'industry': industry,
+                'portfolio_weight': weights,
+                'benchmark_weight': data.get('benchmark_industry', {}).get(industry, 0),
+                'diff': weights - data.get('benchmark_industry', {}).get(industry, 0),
+            })
+    if module7_flat:
+        pd.DataFrame(module7_flat).to_csv(
+            os.path.join(data_dir, "module7_industry.csv"), encoding='utf-8-sig', index=False
+        )
+
     print(f"  中间数据已保存到: {data_dir}")
 
 
@@ -189,10 +205,10 @@ def main():
     主函数 - 执行报告生成的完整流程
     
     执行步骤：
-    1. 初始化配置
+    1. 连接米筐获取前一交易日
     2. 读取本地数据
-    3. 获取米筐数据
-    4. 计算报告指标
+    3. 获取米筐数据（股票价格、因子数据、行业分类）
+    4. 计算报告指标（含行业对比模块7）
     5. 保存中间数据
     6. 生成PDF报告
     """
@@ -207,8 +223,31 @@ def main():
     # 确保输出目录存在
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
 
-    print("\n[1/6] 读取本地数据...")
-    reader = DataReader()
+    # [1/7] 连接米筐获取前一交易日
+    print("\n[1/7] 连接米筐获取前一交易日...")
+    rq_fetcher = RQDataFetcher()
+    prev_date = None
+
+    if rq_fetcher.connect():
+        try:
+            prev_date = rq_fetcher.get_previous_trading_date(config.REPORT_START)
+            print(f"  前一交易日: {prev_date}")
+        except Exception as e:
+            print(f"  获取前一交易日失败: {e}")
+    
+    if not prev_date:
+        # 回退：简单跳过周末
+        from datetime import timedelta
+        start_dt = datetime.strptime(config.REPORT_START, "%Y%m%d")
+        prev_dt = start_dt - timedelta(days=1)
+        while prev_dt.weekday() >= 5:
+            prev_dt -= timedelta(days=1)
+        prev_date = prev_dt.strftime("%Y%m%d")
+        print(f"  使用回退方式获取前一交易日: {prev_date}")
+
+    # [2/7] 读取本地数据
+    print("\n[2/7] 读取本地数据...")
+    reader = DataReader(prev_date=prev_date)
 
     daily_data = reader.collect_daily_data()
     positions_data = reader.collect_positions_data()
@@ -218,18 +257,18 @@ def main():
     print(f"  持仓数据天数: {len(positions_data)}")
 
     # 包含前一交易日用于计算收益率
-    dates_with_prev = [config.REPORT_PREV] + daily_data['dates']
+    dates_with_prev = [prev_date] + daily_data['dates']
 
-    print("\n[2/6] 获取米筐数据...")
+    # [3/7] 获取米筐数据
+    print("\n[3/7] 获取米筐数据...")
 
-    rq_fetcher = RQDataFetcher()
-
-    if not rq_fetcher.connect():
-        print("  米筐连接失败，使用模拟数据继续...")
+    if not rq_fetcher.connected:
+        print("  米筐未连接，使用空数据继续...")
         benchmark_prices = {}
         stock_prices = {}
         style_factors = {}
         benchmark_factors = {}
+        industry_data = {}
     else:
         # 获取基准价格
         benchmark_prices = rq_fetcher.get_benchmark_prices(dates_with_prev)
@@ -268,13 +307,45 @@ def main():
                     benchmark_factors[d] = bf
 
             print(f"  因子数据: 组合{len(style_factors)}天, 基准{len(benchmark_factors)}天")
+
+            # 获取行业分类数据
+            industry_data = {}
+            for d in daily_data['dates']:
+                codes = []
+                if d in positions_data and positions_data[d] is not None:
+                    codes = [_convert_stock_code(c) for c in positions_data[d]['code'].tolist()]
+
+                if codes:
+                    ind = rq_fetcher.get_industry_classification(codes, d)
+                    if ind:
+                        industry_data[d] = ind
+
+                bench_ind = rq_fetcher.get_benchmark_industry_weights(d)
+                if bench_ind:
+                    industry_data[f'{d}_bench'] = bench_ind
+
+            print(f"  行业数据: 组合{sum(1 for k in industry_data if '_bench' not in k)}天, 基准{sum(1 for k in industry_data if '_bench' in k)}天")
+
+            # 获取市场宏观数据（用于市场回顾文字）
+            print("  获取市场宏观数据...")
+            market_overview_data = rq_fetcher.get_market_overview_data(dates_with_prev)
+            if market_overview_data:
+                print(f"    上证指数: {len(market_overview_data.get('sh_index', {}))}天")
+                print(f"    沪深300: {len(market_overview_data.get('hs300', {}))}天")
+                print(f"    期货数据: IF{len(market_overview_data.get('if2606', {}))} IC{len(market_overview_data.get('ic2606', {}))} IM{len(market_overview_data.get('im2606', {}))}")
+            else:
+                market_overview_data = {}
         else:
             stock_prices = {}
             style_factors = {}
             benchmark_factors = {}
+            industry_data = {}
+            market_overview_data = {}
 
-    print("\n[3/6] 计算报告数据...")
-
+    # [4/7] 计算报告数据
+    print("\n[4/7] 计算报告数据...")
+    # print(style_factors)
+    # # exit()
     calculator = ReportCalculator(
         daily_data=daily_data,
         benchmark_prices=benchmark_prices,
@@ -285,6 +356,7 @@ def main():
 
     # 计算各模块
     calc_result = calculator.calc_module1()
+    # print(calc_result)
     print(f"  模块1: 净值增长={calc_result['nav_growth']:.4f}, 基准={calc_result['bench_growth']:.4f}")
 
     module2_data = calculator.calc_module2()
@@ -299,17 +371,52 @@ def main():
     module5_data = calculator.calc_module5(positions_data, stock_prices)
     print(f"  模块5: {len(module5_data)}天集中度数据")
 
-    module6_data = calculator.calc_module6(positions_data, stock_prices)
+    module7_data = calculator.calc_module7(positions_data, stock_prices, industry_data)
+    print(f"  模块7: {len(module7_data)}天行业对比数据")
+
+    # 模块6：从本地parquet文件读取因子暴露数据
+    print("  模块6: 从本地parquet读取因子数据...")
+    factor_exposure_data = {}
+    for d in daily_data['dates']:
+        # 获取组合因子暴露（持仓加权）
+        if d in positions_data and positions_data[d] is not None:
+            portfolio_factors = reader.calculate_portfolio_factor_exposure(d, positions_data[d])
+        else:
+            portfolio_factors = None
+        
+        # 获取基准因子暴露
+        benchmark_factors_local = reader.get_benchmark_factor_exposure(d)
+        
+        if portfolio_factors or benchmark_factors_local:
+            factor_exposure_data[d] = {
+                'portfolio': portfolio_factors or {},
+                'benchmark': benchmark_factors_local or {},
+            }
+    
+    if factor_exposure_data:
+        print(f"    本地因子数据: {len(factor_exposure_data)}天")
+        selected_factors = list(config.FactorConfig.SELECTED_FACTORS.keys())
+        print(f"    因子列表: {selected_factors}")
+    
+    module6_data = calculator.calc_module6(positions_data, stock_prices, factor_exposure_data)
     print(f"  模块6: {len(module6_data)}天因子数据")
 
-    print("\n[4/6] 保存中间数据...")
+    # 计算市场回顾数据
+    market_review_data = calculator.calc_market_review_data(market_overview_data, module3_data)
+    if market_review_data:
+        print(f"  市场回顾: 上证{market_review_data.get('sh_index_return', 0)*100:.2f}%, 沪深300{market_review_data.get('hs300_return', 0)*100:.2f}%")
+        print(f"           股票超额{market_review_data.get('total_stk_contrib', 0)*100:.2f}%, 基差贡献{market_review_data.get('total_fut_contrib', 0)*100:.2f}%")
+
+    # [5/7] 保存中间数据
+    print("\n[5/7] 保存中间数据...")
     save_intermediate_data(
         calc_result, module2_data, module3_data,
-        module4_data, module5_data, module6_data,
+        module4_data, module5_data, module6_data, module7_data,
         daily_data, config.OUTPUT_DIR
     )
 
-    print("\n[5/6] 生成PDF报告...")
+    # [6/7] 生成PDF报告
+    print("\n[6/7] 生成PDF报告...")
 
     # 生成输出文件名
     output_filename = config.get_report_filename(
@@ -319,7 +426,7 @@ def main():
     )
     output_path = os.path.join(config.OUTPUT_DIR, output_filename)
 
-    # 生成PDF报告
+    # 生成PDF报告（模块顺序：1,2,4,5,7,6）
     pdf_gen = PDFGenerator(output_path)
     pdf_gen.build(
         calc_result=calc_result,
@@ -328,7 +435,9 @@ def main():
         module4_data=module4_data,
         module5_data=module5_data,
         module6_data=module6_data,
-        dates=daily_data['dates']
+        module7_data=module7_data,
+        dates=daily_data['dates'],
+        market_review_data=market_review_data
     )
 
     print("\n" + "=" * 60)

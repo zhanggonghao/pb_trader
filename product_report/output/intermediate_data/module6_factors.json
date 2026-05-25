@@ -1,80 +1,62 @@
 {
-  "20260506": {
+  "20260518": {
     "portfolio": {
-      "size": 0.10718740731058145,
-      "non_linear_size": -0.03172910594574469,
-      "momentum": 0.09654456726432789,
-      "liquidity": 0.04952330202964586,
-      "book_to_price": -0.07620113087760212,
-      "leverage": -0.04170485197884702,
-      "growth": 0.06919163464530649,
-      "earnings_yield": -0.009818229179005824,
-      "beta": 0.08325048786979418,
-      "residual_volatility": 0.004678933107458733
+      "lcap_exposure": 0.024041364479290638,
+      "liquidity_exposure": -1.4927004562943713,
+      "beta_exposure": -7.234539207095255e-05
     },
     "benchmark": {
-      "size": 0.6081369288229284,
-      "non_linear_size": -0.1675009517940687,
-      "momentum": -0.33186812977196994,
-      "liquidity": -0.05832140101697807,
-      "book_to_price": -0.1526030949557917,
-      "leverage": 0.04578626769267504,
-      "growth": 0.10497714412994645,
-      "earnings_yield": -0.06588248144593453,
-      "beta": -0.015310370645785144,
-      "residual_volatility": -0.24785410123091758
+      "lcap_exposure": 0.01613871845132366,
+      "liquidity_exposure": -3.320598239928542,
+      "beta_exposure": -0.00038294439216550094
     }
   },
-  "20260507": {
+  "20260519": {
     "portfolio": {
-      "size": 0.10987657077195788,
-      "non_linear_size": -0.035201800581134514,
-      "momentum": 0.1215987928306216,
-      "liquidity": 0.06615901490369089,
-      "book_to_price": -0.08913755924355186,
-      "leverage": -0.041910734507975236,
-      "growth": 0.09089661000270138,
-      "earnings_yield": -0.02413788600242216,
-      "beta": 0.09908477874169451,
-      "residual_volatility": 0.008913937155986826
+      "lcap_exposure": 0.024552995761123207,
+      "liquidity_exposure": -1.43313037248184,
+      "beta_exposure": -3.734721689904028e-05
     },
     "benchmark": {
-      "size": 0.6013168734708751,
-      "non_linear_size": -0.16484205681070246,
-      "momentum": -0.327868446763022,
-      "liquidity": -0.07410399527100972,
-      "book_to_price": -0.13790245657754174,
-      "leverage": 0.05166237087849371,
-      "growth": 0.10128461206338311,
-      "earnings_yield": -0.05101154557503498,
-      "beta": -0.053590061452224384,
-      "residual_volatility": -0.24919345163709344
+      "lcap_exposure": 0.015803841525661656,
+      "liquidity_exposure": -3.338774610988423,
+      "beta_exposure": -0.0004270341969827332
     }
   },
-  "20260508": {
+  "20260520": {
     "portfolio": {
-      "size": 0.09770683949541988,
-      "non_linear_size": -0.030493381268869052,
-      "momentum": 0.09130381476218358,
-      "liquidity": 0.05538290306003991,
-      "book_to_price": -0.07301384944584087,
-      "leverage": -0.04045059992512868,
-      "growth": 0.07676416876547663,
-      "earnings_yield": -0.015603593385919295,
-      "beta": 0.0823334546223749,
-      "residual_volatility": -0.0018764577149011693
+      "lcap_exposure": 0.02548245287189819,
+      "liquidity_exposure": -1.332689289867822,
+      "beta_exposure": 5.0351864367883116e-06
     },
     "benchmark": {
-      "size": 0.6045249936190961,
-      "non_linear_size": -0.16608432740369244,
-      "momentum": -0.3389540882419811,
-      "liquidity": -0.07820102417451646,
-      "book_to_price": -0.12982634070553783,
-      "leverage": 0.05384495570262251,
-      "growth": 0.1060081613356186,
-      "earnings_yield": -0.03938652598183717,
-      "beta": -0.05449079202885467,
-      "residual_volatility": -0.25084716319267497
+      "lcap_exposure": 0.01630957329306708,
+      "liquidity_exposure": -3.4082437014806786,
+      "beta_exposure": -0.00023512640364885276
+    }
+  },
+  "20260521": {
+    "portfolio": {
+      "lcap_exposure": 0.026304762917147083,
+      "liquidity_exposure": -1.2908599802216676,
+      "beta_exposure": 0.00015454397505820997
+    },
+    "benchmark": {
+      "lcap_exposure": 0.016703137905321123,
+      "liquidity_exposure": -3.413625501254931,
+      "beta_exposure": -0.0002591658601035592
+    }
+  },
+  "20260522": {
+    "portfolio": {
+      "lcap_exposure": 0.027244460701904626,
+      "liquidity_exposure": -1.3144739624049377,
+      "beta_exposure": 0.00036184878094861156
+    },
+    "benchmark": {
+      "lcap_exposure": 0.016985900262857883,
+      "liquidity_exposure": -3.4202050477397123,
+      "beta_exposure": -0.0001677013749517866
     }
   }
 }

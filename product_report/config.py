@@ -14,18 +14,17 @@ import os
 # ==============================================================================
 # 基础路径配置
 # ==============================================================================
-input_path = r'E:\code\DailyScripts'
-BASE_DIR = r"E:\Code\product_report"
-TRADE_DATA_DIR = os.path.join(input_path, "TradeData", "standarddata")
+input_path = r'E:\code\generate_split_system\data' # 交易机挂载目录
+BASE_DIR = r"E:\code\product_report"
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 TEMP_DATA_DIR = os.path.join(BASE_DIR, "temp_data")
 INTERMEDIATE_DATA_DIR = os.path.join(OUTPUT_DIR, "intermediate_data")
 
 # 数据源子目录
-NET_EMAIL_DIR = os.path.join(TRADE_DATA_DIR, "net_email")
-STK_FUT_DIR = os.path.join(TRADE_DATA_DIR, "stk_fut")
-POS_DIR = os.path.join(TRADE_DATA_DIR, "pos")
-OUT_IN_DIR = os.path.join(TRADE_DATA_DIR, "out_in")
+NET_EMAIL_DIR = os.path.join(input_path, "raw", "net_email")
+STK_FUT_DIR = os.path.join(input_path, "out", "stk_fut")
+POS_DIR = os.path.join(input_path, "standarddata", "pos")
+OUT_IN_DIR = input_path
 
 # ==============================================================================
 # 产品信息配置
@@ -36,9 +35,8 @@ REPORT_PRODUCT_NAME = "配邦恒升中性1号"
 # ==============================================================================
 # 报告周期配置
 # ==============================================================================
-REPORT_START = "20260506"
-REPORT_END = "20260508"
-REPORT_PREV = "20260430"  # 用于计算期初数据的前一个交易日
+REPORT_START = "20260518"
+REPORT_END = "20260522"
 
 # ==============================================================================
 # 基准配置
@@ -53,11 +51,28 @@ RQ_USERNAME = "license"
 RQ_PASSWORDS = [
     "gCKbHurs4dlMyehGC3GVBEYgFsPRZZiVNUWfCJCS9ifEdXYWnBqgopXvtwMg3GdeJxvb02yljxgaEYxhu1pREMs6k4oFmIU5e0Lf4k56THXNJdgY9i90ehi9i_Hh9sDDSHYg3WgNslsvOwIo4Ku66nV2P1T69RprXP0OIqsep3M=F1112RCtTHbSGqqSJUDAyNXbGm-ik0mkYJGwcAKsg8YNX6oj6u_dAnCo2tUYJ6jp7PAtYxCA3p3SXDA5xa4f_X-eZA5T2vbtFqWkHU5QEz6gDnIsCHX5JSkzUIPqToU8rLOD8D3q-MAJICrCnZ8B4y3Hp6X6KCSR_8X8vMddDkc=",
     "jUrRi5rWOK6uHreZ4wu0xKpFZjBEixs5oNQWutfnMJPpZRx1Gl0tXIJ10-EXkrgE5rIkTzM64U53dN1ZPVvOe8icNOsmwUlD4lsGp5BF9zsNIhJdPIsQGUS7lHz34DID1myOgeNFKHQ09d1Ksl6uEIEx9_9k8t47PyBdAKP_4Eg=Jx6_6AXjiwzgXLUaIbCiNSUjxHL6UStZcJpDfAThNGIH-GijxfIXSBF9SQBGeerCtxJnwW1WRl47cINvGdy4X895G54jfUsMOQCeT8PO4n_TY3vWlzp8jmNcViOCgx2iqHfMlDCdCGMZ9UsSd1XEju90XNLT1gBzpDPOsaC9a30=",
-]
+    ]
 RQ_TIMEOUT = 30  # 米筐连接超时时间（秒）
 
 # ==============================================================================
 # 计算参数配置
+# ==============================================================================
+class FactorConfig:
+    """
+    因子数据配置类
+    """
+    # 因子文件路径，168服务器挂载目录
+    BENCHMARK_FACTOR_PATH = r'Y:\Market\factors\factors_post_1d\adjusted_300_index_exposures.parquet'
+    STOCK_FACTOR_PATH = r'Y:\Market\factors\factors_post_1d\adjusted_1800_vs_300exposures.parquet'
+    
+    # 选择的因子列表
+    SELECTED_FACTORS = {
+        'lcap_exposure': '市值',
+        'liquidity_exposure': '流动性',
+        'beta_exposure': 'Beta',
+    }
+
+
 # ==============================================================================
 class CalculationParams:
     """
@@ -80,15 +95,15 @@ class CalculationParams:
     
     # 因子列表
     FACTOR_LIST = [
-        'size',              # 规模因子
+        'size',              # 规模因子，lcap_exposure
         'non_linear_size',   # 非线性规模因子
-        'momentum',          # 动量因子
-        'liquidity',         # 流动性因子
+        'momentum',          # 动量因子，srmi_exposure，先不算
+        'liquidity',         # 流动性因子，liquidity_exposure
         'book_to_price',     # 价值因子（市净率）
         'leverage',          # 杠杆因子
         'growth',            # 成长因子
         'earnings_yield',    # 盈利因子
-        'beta',              # Beta因子
+        'beta',              # Beta因子， beta_exposure
         'residual_volatility',  # 残差波动因子
     ]
     
