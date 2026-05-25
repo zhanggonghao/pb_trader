@@ -343,29 +343,46 @@ class EmailManager:
             if not filename:
                 continue
 
-            # 解码文件名
+            def fix_filename_encode(s):
+                try:
+                    return s.encode('latin-1').decode('utf-8')
+                except:
+                    try:
+                        return s.encode('gbk').decode('utf-8')
+                    except:
+                        return s
+
+            # 解码邮件头
             decoded_parts = decode_header(filename)
             filename_str = ''
             for content, charset in decoded_parts:
                 if isinstance(content, bytes):
                     try:
-                        # 优先尝试UTF-8解码
-                        filename_str += content.decode('utf-8', errors='ignore')
+                        filename_str += content.decode('utf-8')
                     except:
-                        # 备用解码方式
-                        filename_str += content.decode(charset or 'latin1', errors='ignore')
+                        try:
+                            filename_str += content.decode('gbk')
+                        except:
+                            filename_str += content.decode('gb2312', errors='replace')
                 else:
-                    filename_str += content
-        
-            # 检查扩展名
+                    filename_str += str(content)
+
+            # ====================== 【核心】修复双重乱码（这一行解决你现在的问题） ======================
+            filename_str = fix_filename_encode(filename_str)
+
+            # 清理乱码字符（只保留中文、英文、数字、下划线、横杠、点）
+            import re
+            filename_str = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9_\-\.]', '', filename_str)
+
+            # 后缀检查
             ext = os.path.splitext(filename_str)[1].lower()
             if file_extensions is not None and ext not in file_extensions:
                 continue
 
-            # 清理非法字符
+            # 清理系统非法字符
             clean_name = re.sub(r'[\\/*?:"<>|]', '', filename_str)
             clean_name = re.sub(r'_d(?=\.|$)', '', clean_name)
-            filepath = os.path.join(save_dir, clean_name)  
+            filepath = os.path.join(save_dir, clean_name)
 
             # 保存附件
             with open(filepath, 'wb') as f:

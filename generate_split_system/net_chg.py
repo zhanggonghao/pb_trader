@@ -318,7 +318,7 @@ class ProductNetCalculator:
             if not match_file or not os.path.exists(match_file):
                 try:
                     manager.download_attachments_by_keyword([name, format_predate], save_dir=self.net_email_path,
-                                                            file_extensions=['.xlsx'])
+                                                            file_extensions=['.xlsx', '.xls'])
                 except Exception as e:
                     logger.warning(f"下载 {self.pre_date} {name} 产品净值邮件出错: {e}")
         manager.logout()
