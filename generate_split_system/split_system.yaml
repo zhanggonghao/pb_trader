@@ -59,7 +59,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "ABCD"
-        adjust_value: 80000
+        adjust_value: 150000
         pre_reduce_value: 0
         pre_build_value: 0
 
@@ -86,7 +86,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "WBZD"
-        adjust_value: -20000
+        adjust_value: 0
         pre_reduce_value: 0
         pre_build_value: 0
 
@@ -114,7 +114,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "WBZD" # 无黑名单，无融资黑名单
-        adjust_value: 100000
+        adjust_value: -30000
         pre_build_value: 0
 
   PBHSZX1H:
@@ -143,7 +143,7 @@ product_info:
         t0_algo_starttime: "093000"
         t0_algo_endtime: "145500"
         target_uid: "TCHMD"
-        adjust_value: -30000
+        adjust_value: -10000
         pre_build_value: 0
       gtht_PBHSZX1H:
         acct_chinese_name: "国泰海通配邦恒升中性1号"
@@ -162,7 +162,7 @@ product_info:
         t0_algo_starttime: ""
         t0_algo_endtime: ""
         target_uid: "CZQZX300"
-        adjust_value: 0
+        adjust_value: -30000
         pre_build_value: 0
         # 该账户需从邮件下载外部权重文件
         download_target_email:
